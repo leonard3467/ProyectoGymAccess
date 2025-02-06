@@ -1,0 +1,67 @@
+/* Fondo de toda la ventana */
+window {
+    background-color: #1e1e1e; /* Gris oscuro elegante */
+}
+
+/* Sidebar (barra lateral) */
+#sidebar {
+    background: #252525; /* Negro con un poco de gris */
+    padding: 15px;
+}
+
+/* Título del Sidebar */
+#titulo {
+    font-size: 24px;
+    font-weight: bold;
+    color: #ffffff;  /* Blanco para contrastar */
+    padding: 0px;
+}
+
+/* Botones del Sidebar */
+#boton_sidebar {
+    background: none; /* Sin fondo para que se integre */
+    color: #bbbbbb; /* Gris claro */
+    font-size: 16px;
+    border: none;
+    padding: 12px 20px;
+    transition: background 0.3s ease, color 0.3s ease;
+    border-radius: 0; 
+    box-shadow: none; 
+}
+
+/* Hover en botones: resaltado sutil */
+#boton_sidebar:hover {
+    background: rgba(255, 255, 255, 0.1); /* Blanco con transparencia */
+    color: white;
+    transition: 0.3s;
+}
+
+/* Área principal de contenido */
+#contenido {
+    font-size: 20px;
+    color: #ffffff; /* Letras blancas */
+    padding: 20px;
+}
+
+/* Eliminar cualquier borde o margen en los botones dentro del sidebar */
+#sidebar GtkButton {
+    margin: 0;
+    border: none;
+    box-shadow: none;
+}
+
+#hbox-titulo-logo {
+    margin: 0;
+    padding: 0;
+    border: none;
+}
+
+#logo {
+    margin: 0;
+    padding: 0;
+}
+
+#titulo {
+    margin: 0;
+    padding: 0;
+}
