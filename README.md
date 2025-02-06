@@ -1,3 +1,41 @@
+# Instalación
+
+Para poder ejecutar este código, requeriremos la instalación de **MSYS2** y **GTK** para compilar y ejecutar la aplicación. A continuación, se detallan los pasos necesarios para instalar y configurar el entorno.
+
+## Pasos para instalar MSYS2
+
+1. **Descargar MSYS2**:
+   - Instala **MSYS2** desde [aquí](https://www.msys2.org/).
+   - Una vez instalado **MSYS2**, abre la terminal de MSYS2 desde el menú de inicio.
+
+2. **Actualizar MSYS2**:
+   - Es importante asegurarse de que MSYS2 esté actualizado. Para ello, ejecuta los siguientes comandos en la terminal de MSYS2:
+     ```bash
+     pacman -Syu
+     ```
+
+3. **Instalar GTK+ 3.0**:
+   - Ejecuta el siguiente comando para instalar GTK+ 3.0 y las bibliotecas necesarias para usar la interfaz gráfica en la aplicación:
+     ```bash
+     pacman -S mingw-w64-ucrt-x86_64-gtk3
+     ```
+   - Asegúrate de que el proceso termine sin errores.
+
+4. **Verificar la instalación de GTK**:
+   - Para asegurarte de que GTK se ha instalado correctamente, ejecuta el siguiente comando para verificar que el compilador `pkg-config` esté configurado correctamente:
+     ```bash
+     pkg-config --cflags --libs gtk+-3.0
+     ```
+
+5. **Instalar herramientas adicionales**:
+   - Además de GTK+ 3.0, necesitarás algunas herramientas adicionales para compilar. Ejecuta los siguientes comandos para instalarlas:
+     ```bash
+     pacman -S mingw-w64-ucrt-x86_64-gcc
+     pacman -S mingw-w64-ucrt-x86_64-pkg-config
+     ```
+
+Con estos pasos, se habrá instalado GTK+ 3.0 y las herramientas necesarias para compilar la aplicación en el entorno UCRT64 de MSYS2.
+
 # GymAccess - Aplicación de Control de Usuarios para Gimnasio
 
 **GymAccess** es una aplicación diseñada para gestionar la entrada de usuarios a un gimnasio, controlar sus pagos y suscripciones. Esta aplicación está pensada para ser manejada desde una PC con acceso de administrador, facilitando la administración de clientes y suscripciones de manera eficiente y fácil de usar.
