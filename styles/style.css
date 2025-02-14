@@ -28,6 +28,19 @@ window {
     border-radius: 0; 
     box-shadow: none; 
 }
+#formulario-registro {
+    background-color: rgba(255, 255, 255, 0.05); /* Blanco con transparencia */
+    border: 2px solid rgba(255, 255, 255, 0.2); /* Borde blanco tenue */
+    border-radius: 15px; /* Bordes redondeados */
+    padding: 20px; /* Espaciado interno */
+    box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.3); /* Sombra ligera */
+    font-size: 16px; 
+}
+
+#formulario-registro label {
+    color: white;  /* 📌 Hace que los textos "Nombre:", "Teléfono:", etc., sean blancos */
+    font-weight: bold; /* 📌 Opcional: Hace el texto más grueso */
+}
 
 /* Hover en botones: resaltado sutil */
 #boton_sidebar:hover {
@@ -64,4 +77,220 @@ window {
 #titulo {
     margin: 0;
     padding: 0;
+}
+
+#entry-fecha {
+    background-color: #3a3a3a; /* Gris oscuro */
+    color: #bbbbbb; /* Texto en gris claro */
+    border: 1px solid #555555; /* Borde más oscuro */
+    padding: 5px;
+    border-radius: 5px;
+}
+
+#entry-fecha {
+    min-width: 160px; /* 📌 Hace las cajas más cortas */
+
+    background-color: #acabab; /* 📌 Gris claro */
+    color: #070707; /* 📌 Texto oscuro */
+    border: 1px solid #888888;
+    padding: 5px;
+    border-radius: 5px;
+
+}
+
+/* Evita que cambie el color cuando está en foco */
+#entry-fecha:focus {
+    background-color: #acabab; /* Mantener el gris claro al seleccionar */
+    color: #dddddd;
+    border: 1px solid #888888;
+}
+
+
+/* 📌 Estilo del widget del calendario */
+#calendario-widget {
+    background-color: #2e2e2e;
+    border-radius: 10px;
+    color: #ffffff;
+    padding: 5px;
+}
+
+/* 📌 Reducir el tamaño de las celdas del calendario */
+#calendario-widget GtkCalendar {
+    background-color: #2e2e2e;
+    color: white;
+    font-size: 10px; /* Reducir tamaño del texto */
+}
+
+/* 📌 Efecto hover al pasar el mouse sobre una fecha */
+#calendario-widget .cell {
+    background-color: #444444;
+    border-radius: 5px;
+    transition: background-color 0.3s ease-in-out;
+}
+
+/* 📌 Cuando el mouse está encima (se ilumina en gris) */
+#calendario-widget .cell:hover {
+    background-color: #888888; /* **Gris en hover** */
+    color: #000000;
+}
+
+/* 📌 Día seleccionado en gris */
+#calendario-widget:selected {
+    background-color: #666666; /* **Gris en selección** */
+    color: black;
+    border-radius: 5px;
+}
+
+
+button.boton-alta {
+    background-image: none;
+    background-color: #28a745; /* sin !important */
+    color: #ffffff;
+}
+
+
+button.boton-alta:hover {
+    background-color: #218838 
+}
+
+button.boton-cancelar {
+    background-image: none;
+    background-color: #dc3545;
+    color: #ffffff;
+}
+
+button.boton-cancelar:hover {
+    background-color: #c82333 ;
+}
+
+button.boton-calendario {
+    background-image: none;
+    background-color: white; /* 📌 Botón blanco */
+    color: black; /* 📌 Color del icono en negro */
+    border: 1px solid #aaaaaa; /* 📌 Borde gris */
+    padding: 5px;
+    border-radius: 5px;
+    font-weight: normal;
+    font-size: 18px; /* 📌 Ajustar tamaño del icono si es necesario */
+
+}
+
+button.boton-calendario:hover {
+    background-color: #f0f0f0; /* 📌 Un poco más gris en hover */
+}
+
+
+/**/
+/* 📌 Contenedor de la barra de búsqueda */
+#busqueda-container {
+    padding: 15px;
+}
+
+/* 📌 Label con texto blanco y negrita */
+#label-busqueda {
+    color: white;
+    font-weight: bold;
+    font-size: 14px;
+}
+
+/* 📌 Estiliza la barra de búsqueda */
+#busqueda-box {
+    background: #ffffff;
+    border-radius: 25px; /* Hace la barra ovalada */
+    padding: 5px;
+    border: 2px solid #ccc;
+}
+
+/* 📌 Estilo para el ícono de búsqueda */
+#icono-busqueda {
+    padding-right: 10px;
+    opacity: 0.6; /* Hace el icono más suave */
+}
+
+/* 📌 Cambia el color del icono al pasar el mouse */
+#icono-busqueda:hover {
+    opacity: 1;
+}
+
+
+/* 📌 Estiliza la lista de sugerencias del GtkEntryCompletion */
+GtkEntryCompletion {
+    background-color: #2b2b2b;
+    border: 2px solid #4CAF50;
+    border-radius: 8px;
+}
+
+/* 📌 Opciones dentro del menú de sugerencias */
+GtkTreeView {
+    background-color: #2b2b2b;
+    color: white;
+}
+
+/* 📌 Estilo para cada opción en la lista */
+GtkTreeView row {
+    background-color: #2b2b2b;
+    color: white;
+    padding: 5px;
+}
+
+/* 📌 Cuando pasas el cursor sobre una opción */
+GtkTreeView row:selected {
+    background-color: #4CAF50;
+    color: white;
+}
+
+
+GtkWindow.popup {
+    background-color: #1e1e1e;
+    border-radius: 8px;
+    border: 2px solid #4CAF50;
+}
+#box-ficha-cliente {
+    background-color: #1e1e1e;
+    padding: 10px;
+    border-radius: 10px;
+    border: 2px solid #8f8f8f;
+}
+
+#ficha-info {
+    color: white;
+    font-size: 14px;
+}
+
+button.boton-pago {
+    background-image: none;
+    background-color: #4CAF50; /* Verde similar al botón de alta */
+    color: #ffffff;
+    font-size: 14px;
+    border-radius: 5px;
+    padding: 10px;
+    border: none;
+}
+
+button.boton-pago:hover {
+    background-color: #77c47a; /* Un tono más oscuro al pasar el mouse */
+}
+
+/* Estilo para el diálogo de proceder pago */
+#dialog-proceder-pago {
+    background-color: #2e2e2e;  /* Gris elegante */
+    border: 2px solid #555555;
+    border-radius: 10px;
+    color: #ffffff;
+}
+
+/* Asegura que el área de contenido también tenga el mismo fondo */
+#content-area-proceder-pago {
+    background-color: #2e2e2e;
+    color: #ffffff;
+}
+
+button.boton-pago {
+    background-image: none;
+    background-color: #4CAF50; /* Verde */
+    color: #ffffff;
+    font-size: 14px;
+    border-radius: 5px;
+    padding: 10px;
+    border: none;
 }

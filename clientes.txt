@@ -1,0 +1,10 @@
+1|Leonardo Castillo Martinez|5633828613|leomartinez17y@gmail.com|Mensual|12/02/2025|12/03/2025|0|0|0|0
+2|Ana Rodríguez López|5523145678|anarodriguez@gmail.com|Anual|01/03/2025|01/03/2026|0|1|0|0
+3|Carlos Pérez Gómez|5547654321|carlosperez23@gmail.com|Mensual|15/03/2025|15/04/2025|0|0|0|0
+4|María González Ruiz|5589123456|mariagonzalez@gmail.com|Anual|28/02/2025|28/02/2026|0|1|0|0
+5|Javier Herrera Díaz|5512348765|javierh@gmail.com|Mensual|10/04/2025|10/05/2025|0|0|0|0
+6|Fernanda Ramírez Torres|5534789210|fernandar@gmail.com|Anual|20/03/2025|20/03/2026|0|1|0|0
+7|Ricardo Mendoza Vega|5576894321|ricardomendoza@gmail.com|Mensual|05/05/2025|05/06/2025|0|0|0|0
+8|Sofía Morales Campos|5598765432|sofia_morales@gmail.com|Anual|14/04/2025|14/04/2026|0|1|0|0
+9|Emilio Cortés Flores|5567891234|emiliocortes@gmail.com|Mensual|22/06/2025|22/07/2025|0|0|0|0
+10|Paula Sánchez Herrera|5509123456|paulasanchez@gmail.com|Anual|30/05/2025|30/05/2026|0|1|0|0
