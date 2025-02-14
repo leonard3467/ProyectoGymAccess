@@ -1,4 +1,20 @@
-# Instalación
+# GymAccess - Aplicación de Control de Usuarios para Gimnasio
+
+**GymAccess** es una aplicación diseñada para gestionar la entrada de usuarios a un gimnasio, controlar sus pagos y suscripciones. Esta aplicación está pensada para ser manejada desde una PC con acceso de administrador, facilitando la administración de clientes y suscripciones de manera eficiente y fácil de usar.
+
+## Compilación
+
+Para compilar el proyecto, usa el siguiente comando en la terminal:
+
+```sh
+gcc -o build/gymaccess \
+    src/main.c \
+    src/interfaz.c \
+    src/sidebar.c \
+    src/clientes.c \
+    src/pagar.c \
+    `pkg-config --cflags --libs gtk+-3.0`
+
 
 Para poder ejecutar este código, requeriremos la instalación de **MSYS2** y **GTK** para compilar y ejecutar la aplicación. A continuación, se detallan los pasos necesarios para instalar y configurar el entorno.
 
