@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <glib.h>
+#include <sqlite3.h>  
 
 // 📌 Variables globales para la búsqueda
 static GtkWidget *entry_busqueda, *label_resultado;
@@ -35,54 +36,63 @@ char* normalizar_texto(const char *texto) {
 }
 
 
-// 📌 Función para buscar un cliente en clientes.txt
 gboolean buscar_cliente(const char *busqueda, Cliente *cliente_encontrado) {
-    FILE *archivo = fopen(ARCHIVO_CLIENTES, "r");
-    if (!archivo) {
-        return FALSE; // No se pudo abrir el archivo
+    sqlite3 *db;
+    int rc = sqlite3_open("clientes.db", &db);
+    if (rc != SQLITE_OK) {
+        g_print("Error al abrir la BD: %s\n", sqlite3_errmsg(db));
+        sqlite3_close(db);
+        return FALSE;
     }
 
-    char buffer[1024];
-    Cliente c;
-    while (fgets(buffer, sizeof(buffer), archivo)) {
-        sscanf(buffer, "%d|%49[^|]|%14[^|]|%49[^|]|%19[^|]|%10[^|]|%10[^|]|%d|%d|%d|%d",
-            &c.id, c.nombre, c.telefono, c.correo, c.tipo_plan,
-            c.fecha_inicio, c.fecha_fin, &c.asistencia_total, &c.saldo_pendiente,
-            &c.meses_adelantados, &c.años_adelantados);
+    const char *sql = 
+        "SELECT id, nombre, telefono, correo, tipo_plan, fecha_inicio, fecha_fin, "
+        "asistencia_total, saldo_pendiente, meses_adelantados, años_adelantados "
+        "FROM clientes "
+        "WHERE id = ? OR nombre LIKE ? OR telefono = ? OR correo = ? LIMIT 1;";
 
-        
-        // Comparar con ID, nombre, correo o teléfono
-        char id_str[10];
-        snprintf(id_str, sizeof(id_str), "%d", c.id);
-       char *busqueda_normalizada = normalizar_texto(busqueda);
-        char *nombre_normalizado = normalizar_texto(c.nombre);
-        char *telefono_normalizado = normalizar_texto(c.telefono);
-        char *correo_normalizado = normalizar_texto(c.correo);
-
-        if (strcmp(id_str, busqueda_normalizada) == 0 ||
-            strcmp(nombre_normalizado, busqueda_normalizada) == 0 ||
-            strcmp(telefono_normalizado, busqueda_normalizada) == 0 ||
-            strcmp(correo_normalizado, busqueda_normalizada) == 0) {
-            
-            *cliente_encontrado = c;
-            g_free(busqueda_normalizada);
-            g_free(nombre_normalizado);
-            g_free(telefono_normalizado);
-            g_free(correo_normalizado);
-            fclose(archivo);
-            return TRUE;
-        }
-
-        // 📌 Liberar memoria
-        g_free(busqueda_normalizada);
-        g_free(nombre_normalizado);
-        g_free(telefono_normalizado);
-        g_free(correo_normalizado);
-
+    sqlite3_stmt *stmt;
+    rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
+    if (rc != SQLITE_OK) {
+        g_print("Error al preparar consulta: %s\n", sqlite3_errmsg(db));
+        sqlite3_close(db);
+        return FALSE;
     }
-    fclose(archivo);
-    return FALSE;
+
+    // Intentamos buscar por ID (si la cadena es numérica) o por coincidencia parcial en el nombre
+    int id = atoi(busqueda);
+    sqlite3_bind_int(stmt, 1, id);
+    // Usamos LIKE para buscar por nombre con comodín
+    char busqueda_like[100];
+    snprintf(busqueda_like, sizeof(busqueda_like), "%%%s%%", busqueda);
+    sqlite3_bind_text(stmt, 2, busqueda_like, -1, SQLITE_STATIC);
+    sqlite3_bind_text(stmt, 3, busqueda, -1, SQLITE_STATIC);
+    sqlite3_bind_text(stmt, 4, busqueda, -1, SQLITE_STATIC);
+
+    rc = sqlite3_step(stmt);
+    if (rc == SQLITE_ROW) {
+        cliente_encontrado->id = sqlite3_column_int(stmt, 0);
+        strncpy(cliente_encontrado->nombre, (const char *)sqlite3_column_text(stmt, 1), sizeof(cliente_encontrado->nombre));
+        strncpy(cliente_encontrado->telefono, (const char *)sqlite3_column_text(stmt, 2), sizeof(cliente_encontrado->telefono));
+        strncpy(cliente_encontrado->correo, (const char *)sqlite3_column_text(stmt, 3), sizeof(cliente_encontrado->correo));
+        strncpy(cliente_encontrado->tipo_plan, (const char *)sqlite3_column_text(stmt, 4), sizeof(cliente_encontrado->tipo_plan));
+        strncpy(cliente_encontrado->fecha_inicio, (const char *)sqlite3_column_text(stmt, 5), sizeof(cliente_encontrado->fecha_inicio));
+        strncpy(cliente_encontrado->fecha_fin, (const char *)sqlite3_column_text(stmt, 6), sizeof(cliente_encontrado->fecha_fin));
+        cliente_encontrado->asistencia_total = sqlite3_column_int(stmt, 7);
+        cliente_encontrado->saldo_pendiente = sqlite3_column_int(stmt, 8);
+        cliente_encontrado->meses_adelantados = sqlite3_column_int(stmt, 9);
+        cliente_encontrado->años_adelantados = sqlite3_column_int(stmt, 10);
+
+        sqlite3_finalize(stmt);
+        sqlite3_close(db);
+        return TRUE;
+    } else {
+        sqlite3_finalize(stmt);
+        sqlite3_close(db);
+        return FALSE;
+    }
 }
+
 
 void actualizar_busqueda(GtkWidget *widget, gpointer data) {
     const char *busqueda = gtk_entry_get_text(GTK_ENTRY(entry_busqueda));
@@ -104,71 +114,87 @@ void actualizar_busqueda(GtkWidget *widget, gpointer data) {
 }
 
 
-
 GtkWidget* crear_busqueda() {
     GtkWidget *box, *label_busqueda, *entry_box, *icono_busqueda;
-
-    // 📌 Contenedor vertical para centrar
+    
+    // Contenedor vertical para centrar la búsqueda
     box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 5);
     gtk_widget_set_name(box, "busqueda-container");
 
-    // 📌 Label estilizado
+    // Label de instrucción
     label_busqueda = gtk_label_new("Ingrese ID, Nombre, Correo o Teléfono:");
     gtk_widget_set_name(label_busqueda, "label-busqueda");
 
-    // 📌 Contenedor horizontal para la entrada + ícono
+    // Contenedor horizontal para el campo de búsqueda y el ícono
     entry_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 10);
     gtk_widget_set_name(entry_box, "busqueda-box");
 
-    // 📌 Entrada de texto
+    // Entrada de texto para buscar
     entry_busqueda = gtk_entry_new();
     gtk_widget_set_name(entry_busqueda, "busqueda-entry");
     gtk_entry_set_placeholder_text(GTK_ENTRY(entry_busqueda), "Buscar cliente...");
 
-    // 📌 Ícono de búsqueda (lado derecho)
+    // Ícono de búsqueda
     icono_busqueda = gtk_image_new_from_icon_name("system-search-symbolic", GTK_ICON_SIZE_BUTTON);
     gtk_widget_set_name(icono_busqueda, "icono-busqueda");
 
-    // 📌 Agregar autocompletado
+    // Configurar autocompletado
     GtkEntryCompletion *completion = gtk_entry_completion_new();
+    // Crear un modelo de lista que contendrá cadenas (nombre, teléfono y correo)
     GtkListStore *store = gtk_list_store_new(1, G_TYPE_STRING);
 
-    // 📌 Llenar el modelo con los datos de los clientes
-    FILE *archivo = fopen(ARCHIVO_CLIENTES, "r");
-    if (archivo) {
-        char buffer[1024];
-        Cliente c;
-        while (fgets(buffer, sizeof(buffer), archivo)) {
-            sscanf(buffer, "%d|%49[^|]|%14[^|]|%49[^|]|%19[^|]|%10[^|]|%10[^|]|%d|%d",
-                   &c.id, c.nombre, c.telefono, c.correo, c.tipo_plan,
-                   c.fecha_inicio, c.fecha_fin, &c.asistencia_total, &c.saldo_pendiente);
-            
-            GtkTreeIter iter;
-            gtk_list_store_append(store, &iter);
-            gtk_list_store_set(store, &iter, 0, c.nombre, -1);
-            gtk_list_store_append(store, &iter);
-            gtk_list_store_set(store, &iter, 0, c.telefono, -1);
-            gtk_list_store_append(store, &iter);
-            gtk_list_store_set(store, &iter, 0, c.correo, -1);
+    // Abrir la base de datos y llenar el modelo con datos
+    sqlite3 *db;
+    int rc = sqlite3_open("clientes.db", &db);
+    if (rc == SQLITE_OK) {
+        const char *sql = "SELECT nombre, telefono, correo FROM clientes;";
+        sqlite3_stmt *stmt;
+        rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
+        if (rc == SQLITE_OK) {
+            while (sqlite3_step(stmt) == SQLITE_ROW) {
+                const char *nombre = (const char *)sqlite3_column_text(stmt, 0);
+                const char *telefono = (const char *)sqlite3_column_text(stmt, 1);
+                const char *correo = (const char *)sqlite3_column_text(stmt, 2);
+                GtkTreeIter iter;
+                // Agregar nombre
+                gtk_list_store_append(store, &iter);
+                gtk_list_store_set(store, &iter, 0, nombre, -1);
+                // Agregar teléfono
+                gtk_list_store_append(store, &iter);
+                gtk_list_store_set(store, &iter, 0, telefono, -1);
+                // Agregar correo
+                gtk_list_store_append(store, &iter);
+                gtk_list_store_set(store, &iter, 0, correo, -1);
+            }
+            sqlite3_finalize(stmt);
+        } else {
+            g_print("❌ Error al preparar la consulta: %s\n", sqlite3_errmsg(db));
         }
-        fclose(archivo);
+        sqlite3_close(db);
+    } else {
+        g_print("❌ Error al abrir la base de datos: %s\n", sqlite3_errmsg(db));
     }
 
+    // Configurar el objeto de completado con el modelo creado
     gtk_entry_completion_set_model(completion, GTK_TREE_MODEL(store));
     gtk_entry_completion_set_text_column(completion, 0);
     gtk_entry_completion_set_inline_completion(completion, TRUE);
     gtk_entry_set_completion(GTK_ENTRY(entry_busqueda), completion);
 
-    // 📌 Agregar widgets
+    // Empaquetar la entrada y el ícono en el contenedor horizontal
     gtk_box_pack_start(GTK_BOX(entry_box), entry_busqueda, TRUE, TRUE, 10);
-    gtk_box_pack_start(GTK_BOX(entry_box), icono_busqueda, FALSE, FALSE, 5);  // Icono a la derecha
+    gtk_box_pack_start(GTK_BOX(entry_box), icono_busqueda, FALSE, FALSE, 5);
+
+    // Empaquetar el label y el contenedor horizontal en el contenedor principal
     gtk_box_pack_start(GTK_BOX(box), label_busqueda, FALSE, FALSE, 5);
     gtk_box_pack_start(GTK_BOX(box), entry_box, FALSE, FALSE, 5);
 
+    // Conectar la señal "changed" para actualizar la búsqueda en tiempo real
     g_signal_connect(entry_busqueda, "changed", G_CALLBACK(actualizar_busqueda), NULL);
 
     return box;
 }
+
 
 GtkWidget* generar_pago(GtkWidget *parent_window) {
     GtkWidget *box, *busqueda;

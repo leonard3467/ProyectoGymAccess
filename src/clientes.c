@@ -6,7 +6,8 @@
 #include <string.h>
 #include <stdbool.h>
 #include <time.h>
-#include <glib.h>  // Necesario para usar expresiones regulares
+#include <glib.h>  // expresiones regulares
+#include <sqlite3.h>  // usaremos esta libreria paara cambiar el .txt por una base de datos local
 
 // 📌 Variables globales para los GtkEntry y ComboBox
 static GtkWidget *entry_nombre, *entry_telefono, *entry_correo, *combo_plan, *entry_inicio, *entry_fin;
@@ -120,7 +121,10 @@ void actualizar_validacion_correo(GtkWidget *widget, gpointer data) {
     gtk_label_set_markup(GTK_LABEL(label_warn_correo), "<span foreground='green'>✔️ Correo válido</span>");
 }
 
-void guardar_cliente(GtkWidget *widget, gpointer data) {
+
+
+void guardar_cliente_sqlite(GtkWidget *widget, gpointer data) {
+    // 1) Leer campos de los GtkEntry
     const char *nombre = gtk_entry_get_text(GTK_ENTRY(entry_nombre));
     const char *telefono = gtk_entry_get_text(GTK_ENTRY(entry_telefono));
     const char *correo = gtk_entry_get_text(GTK_ENTRY(entry_correo));
@@ -128,97 +132,144 @@ void guardar_cliente(GtkWidget *widget, gpointer data) {
     const char *inicio = gtk_entry_get_text(GTK_ENTRY(entry_inicio));
     const char *fin = gtk_entry_get_text(GTK_ENTRY(entry_fin));
 
-    // 📌 Validaciones antes de guardar
+    // 2) Validaciones antes de guardar
     if (strlen(nombre) == 0 || strlen(telefono) == 0 || strlen(correo) == 0 ||
         plan == NULL || strlen(inicio) == 0 || strlen(fin) == 0) {
-        gtk_label_set_markup(GTK_LABEL(label_warn_general), "<span foreground='#ff4d4d'><b>⚠️ Todos los campos deben estar llenos.</b></span>");
+        gtk_label_set_markup(GTK_LABEL(label_warn_general),
+            "<span foreground='#ff4d4d'><b>⚠️ Todos los campos deben estar llenos.</b></span>");
         return;
     }
 
     if (!validar_telefono(telefono)) {
-        gtk_label_set_markup(GTK_LABEL(label_warn_general), "<span foreground='#ff4d4d'><b>⚠️ El teléfono debe tener al menos 10 dígitos.</b></span>");
+        gtk_label_set_markup(GTK_LABEL(label_warn_general),
+            "<span foreground='#ff4d4d'><b>⚠️ El teléfono debe tener al menos 10 dígitos.</b></span>");
         return;
     }
 
     if (!validar_correo(correo)) {
-        gtk_label_set_markup(GTK_LABEL(label_warn_general), "<span foreground='#ff4d4d'><b>⚠️ Correo inválido. Debe contener '@' y un dominio.</b></span>");
+        gtk_label_set_markup(GTK_LABEL(label_warn_general),
+            "<span foreground='#ff4d4d'><b>⚠️ Correo inválido. Debe contener '@' y un dominio.</b></span>");
         return;
     }
 
-    // 📌 Verificar duplicados en el archivo
-    if (existe_dato_en_archivo(telefono, 1)) {
-        gtk_label_set_markup(GTK_LABEL(label_warn_general), "<span foreground='#ff4d4d'><b>⚠️ Este teléfono ya fue dado de alta.</b></span>");
+    // 3) Verificar duplicados (en BD). Puedes omitir esto y capturar el error UNIQUE
+    //    del INSERT, pero aquí un ejemplo con SELECT:
+
+    sqlite3 *db;
+    char *errMsg = NULL;
+    int rc = sqlite3_open("clientes.db", &db);
+    if (rc != SQLITE_OK) {
+        g_print("❌ Error al abrir la base de datos: %s\n", sqlite3_errmsg(db));
+        sqlite3_close(db);
         return;
     }
 
-    if (existe_dato_en_archivo(correo, 2)) {
-        gtk_label_set_markup(GTK_LABEL(label_warn_general), "<span foreground='#ff4d4d'><b>⚠️ Este correo ya fue dado de alta.</b></span>");
+    // Consulta para ver si teléfono o correo ya existen
+    const char *sql_busqueda = 
+        "SELECT 1 FROM clientes WHERE telefono = ? OR correo = ? LIMIT 1;";
+    sqlite3_stmt *stmt_busqueda;
+    rc = sqlite3_prepare_v2(db, sql_busqueda, -1, &stmt_busqueda, NULL);
+    if (rc != SQLITE_OK) {
+        g_print("❌ Error al preparar la consulta de duplicados: %s\n", sqlite3_errmsg(db));
+        sqlite3_close(db);
         return;
     }
 
-    // 📌 🔥 CREAR CLIENTE DINÁMICO PARA PASAR A generar_pago_alta
+    // Bind de parámetros (teléfono, correo)
+    sqlite3_bind_text(stmt_busqueda, 1, telefono, -1, SQLITE_STATIC);
+    sqlite3_bind_text(stmt_busqueda, 2, correo,   -1, SQLITE_STATIC);
+
+    rc = sqlite3_step(stmt_busqueda);
+    if (rc == SQLITE_ROW) {
+        // Significa que encontró un registro => duplicado
+        gtk_label_set_markup(GTK_LABEL(label_warn_general),
+            "<span foreground='#ff4d4d'><b>⚠️ El teléfono o correo ya fue dado de alta.</b></span>");
+        sqlite3_finalize(stmt_busqueda);
+        sqlite3_close(db);
+        return;
+    }
+    // Si rc == SQLITE_DONE => no hay duplicado
+    sqlite3_finalize(stmt_busqueda);
+    // No cerramos todavía db, la usaremos tras generar_pago
+
+    // 4) Crear el struct Cliente en memoria
     Cliente *nuevo_cliente = malloc(sizeof(Cliente));
     if (!nuevo_cliente) {
-        fprintf(stderr, "❌ Error: No se pudo asignar memoria para el cliente\n");
+        g_print("❌ Error: no se pudo asignar memoria para el cliente\n");
+        sqlite3_close(db);
         return;
     }
 
-    // 📌 Copiar los datos ingresados al nuevo cliente
-    int id = obtener_siguiente_id();
-    nuevo_cliente->id = id;
+    // Asignar valores. (ID no es necesario si en la BD es AUTOINCREMENT).
+    nuevo_cliente->id = 0; // se autogenerará
     strncpy(nuevo_cliente->nombre, nombre, sizeof(nuevo_cliente->nombre));
     strncpy(nuevo_cliente->telefono, telefono, sizeof(nuevo_cliente->telefono));
-    strncpy(nuevo_cliente->correo, correo, sizeof(nuevo_cliente->correo));
-    strncpy(nuevo_cliente->tipo_plan, plan, sizeof(nuevo_cliente->tipo_plan));
+    strncpy(nuevo_cliente->correo,  correo,  sizeof(nuevo_cliente->correo));
+    strncpy(nuevo_cliente->tipo_plan, plan,  sizeof(nuevo_cliente->tipo_plan));
     strncpy(nuevo_cliente->fecha_inicio, inicio, sizeof(nuevo_cliente->fecha_inicio));
-    strncpy(nuevo_cliente->fecha_fin, fin, sizeof(nuevo_cliente->fecha_fin));
-    nuevo_cliente->asistencia_total = 0;
-    nuevo_cliente->saldo_pendiente = 1;
-    nuevo_cliente->meses_adelantados = 0;
+    strncpy(nuevo_cliente->fecha_fin,    fin,    sizeof(nuevo_cliente->fecha_fin));
+    nuevo_cliente->asistencia_total  = 0;
+    nuevo_cliente->saldo_pendiente  = 1;  // al inicio 1 => “tiene que pagar”
+    nuevo_cliente->meses_adelantados= 0;
     nuevo_cliente->años_adelantados = 0;
 
-    // 📌 🔥 ABRIR VENTANA DE PAGO Y OBTENER RESPUESTA
+    // 5) Abrir ventana de pago
     gint response = generar_pago_alta(widget, nuevo_cliente);
 
-    // 📌 Si el usuario canceló el pago, no registrar al cliente y mostrar advertencia
+    // 6) Si el usuario canceló el pago
     if (response == GTK_RESPONSE_CANCEL || response == GTK_RESPONSE_DELETE_EVENT) {
-        gtk_label_set_markup(GTK_LABEL(label_warn_general), "<span foreground='#ff4d4d'><b>⚠️ Cliente no registrado debido a que no se realizó el pago.</b></span>");
+        gtk_label_set_markup(GTK_LABEL(label_warn_general),
+            "<span foreground='#ff4d4d'><b>⚠️ Cliente no registrado porque no se realizó el pago.</b></span>");
         free(nuevo_cliente);
-        return;  // Aquí el flujo se detiene
-    }
-
-    // 📌 🔥 SI EL PAGO SE REALIZÓ, REGISTRAR AL CLIENTE CON DATOS ACTUALIZADOS
-    FILE *archivo = fopen(ARCHIVO_CLIENTES, "a");
-    if (!archivo) {
-        gtk_label_set_markup(GTK_LABEL(label_warn_general), "<span foreground='#ff4d4d'><b>⚠️ Error al abrir el archivo de clientes.</b></span>");
-        free(nuevo_cliente);
+        sqlite3_close(db);
         return;
     }
 
-    // 📌 Actualizar saldo_pendiente a 0 (falso) y guardar fechas
-    nuevo_cliente->saldo_pendiente = 0;  
+    // 7) Insertar en la BD (pago realizado => saldo_pendiente = 0)
+    nuevo_cliente->saldo_pendiente = 0;
 
-    fprintf(archivo, "%d|%s|%s|%s|%s|%s|%s|%d|%d|%d|%d\n", 
-        nuevo_cliente->id, 
-        nuevo_cliente->nombre, 
-        nuevo_cliente->telefono, 
-        nuevo_cliente->correo, 
-        nuevo_cliente->tipo_plan, 
-        nuevo_cliente->fecha_inicio, 
-        nuevo_cliente->fecha_fin, 
-        nuevo_cliente->asistencia_total, 
-        nuevo_cliente->saldo_pendiente, 
-        nuevo_cliente->meses_adelantados, 
-        nuevo_cliente->años_adelantados
-    );
+    const char *sql_insert = 
+        "INSERT INTO clientes (nombre, telefono, correo, tipo_plan, fecha_inicio, fecha_fin, "
+        "asistencia_total, saldo_pendiente, meses_adelantados, años_adelantados) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);";
 
-    fclose(archivo);
+    sqlite3_stmt *stmt_insert;
+    rc = sqlite3_prepare_v2(db, sql_insert, -1, &stmt_insert, NULL);
+    if (rc != SQLITE_OK) {
+        g_print("❌ Error al preparar INSERT: %s\n", sqlite3_errmsg(db));
+        free(nuevo_cliente);
+        sqlite3_close(db);
+        return;
+    }
 
-    gtk_label_set_text(GTK_LABEL(label_warn_general), "✔️ Cliente registrado con éxito y pago realizado.");
+    sqlite3_bind_text(stmt_insert, 1, nuevo_cliente->nombre, -1, SQLITE_STATIC);
+    sqlite3_bind_text(stmt_insert, 2, nuevo_cliente->telefono, -1, SQLITE_STATIC);
+    sqlite3_bind_text(stmt_insert, 3, nuevo_cliente->correo, -1, SQLITE_STATIC);
+    sqlite3_bind_text(stmt_insert, 4, nuevo_cliente->tipo_plan, -1, SQLITE_STATIC);
+    sqlite3_bind_text(stmt_insert, 5, nuevo_cliente->fecha_inicio, -1, SQLITE_STATIC);
+    sqlite3_bind_text(stmt_insert, 6, nuevo_cliente->fecha_fin, -1, SQLITE_STATIC);
+    sqlite3_bind_int(stmt_insert,  7, nuevo_cliente->asistencia_total);
+    sqlite3_bind_int(stmt_insert,  8, nuevo_cliente->saldo_pendiente);
+    sqlite3_bind_int(stmt_insert,  9, nuevo_cliente->meses_adelantados);
+    sqlite3_bind_int(stmt_insert, 10, nuevo_cliente->años_adelantados);
+
+    rc = sqlite3_step(stmt_insert);
+    if (rc != SQLITE_DONE) {
+        g_print("❌ Error al insertar el cliente: %s\n", sqlite3_errmsg(db));
+        gtk_label_set_markup(GTK_LABEL(label_warn_general),
+            "<span foreground='#ff4d4d'><b>⚠️ Error al insertar en la BD</b></span>");
+    } else {
+        g_print("✔️ Cliente registrado exitosamente en la base de datos.\n");
+        gtk_label_set_text(GTK_LABEL(label_warn_general),
+            "✔️ Cliente registrado con éxito y pago realizado (en la BD).");
+    }
+
+    sqlite3_finalize(stmt_insert);
+    sqlite3_close(db);
+
+    // 8) Liberar memoria del struct
     free(nuevo_cliente);
 }
-
-
 
 
 void abrir_calendario(GtkWidget *widget, gpointer data) {
@@ -432,8 +483,7 @@ GtkWidget* crear_formulario_registro(GtkWidget *parent_window) {
 
     // 📌 Botón "Dar de Alta" (verde)
     btn_alta = gtk_button_new_with_label("Dar de Alta");
-    g_signal_connect(btn_alta, "clicked", G_CALLBACK(guardar_cliente), NULL);
-
+    g_signal_connect(btn_alta, "clicked", G_CALLBACK(guardar_cliente_sqlite), NULL);
     // 📌 Botón "Cancelar" (rojo)
     btn_cancelar = gtk_button_new_with_label("Cancelar");
     g_signal_connect(btn_cancelar, "clicked", G_CALLBACK(limpiar_formulario), NULL);
@@ -473,17 +523,32 @@ void limpiar_formulario(GtkWidget *widget, gpointer data) {
     gtk_label_set_text(GTK_LABEL(label_warn_general), "");
 }
 void filtrar_telefono(GtkEditable *editable, const gchar *text, gint length, gint *position, gpointer data) {
-    for (int i = 0; i < length; i++) {
-        if (!g_ascii_isdigit(text[i])) { // Si no es un número, bloquea la entrada
-            g_signal_stop_emission_by_name(editable, "insert-text");
-            gtk_label_set_markup(GTK_LABEL(label_warn_telefono), "<span foreground='orange'>⚠️ Solo números permitidos</span>");
-            return;
-        }
+    // Obtener el texto actual del campo
+    const gchar *current_text = gtk_entry_get_text(GTK_ENTRY(editable));
+    gint current_length = strlen(current_text);
+
+    // Si al agregar se exceden 10 dígitos, bloquear la inserción y mostrar advertencia
+    if (current_length + length > 10) {
+         g_signal_stop_emission_by_name(editable, "insert-text");
+         gtk_label_set_markup(GTK_LABEL(label_warn_telefono),
+              "<span foreground='orange'>⚠️no exceder 10 dígitos</span>");
+         return;
     }
 
-    // Si todo está bien, quitar el mensaje de advertencia
+    // Verificar que los caracteres a insertar sean numéricos
+    for (int i = 0; i < length; i++) {
+         if (!g_ascii_isdigit(text[i])) {
+              g_signal_stop_emission_by_name(editable, "insert-text");
+              gtk_label_set_markup(GTK_LABEL(label_warn_telefono),
+                   "<span foreground='orange'>⚠️ Solo números permitidos</span>");
+              return;
+         }
+    }
+
+    // Si todo es correcto, quitar el mensaje de advertencia
     gtk_label_set_text(GTK_LABEL(label_warn_telefono), "");
 }
+
 
 bool existe_dato_en_archivo(const char *dato, int tipo) {
     FILE *archivo = fopen(ARCHIVO_CLIENTES, "r");

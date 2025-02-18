@@ -8,3 +8,4 @@
 8|Sofía Morales Campos|5598765432|sofia_morales@gmail.com|Anual|14/04/2025|14/04/2026|0|1|0|0
 9|Emilio Cortés Flores|5567891234|emiliocortes@gmail.com|Mensual|22/06/2025|22/07/2025|0|0|0|0
 10|Paula Sánchez Herrera|5509123456|paulasanchez@gmail.com|Anual|30/05/2025|30/05/2026|0|1|0|0
+

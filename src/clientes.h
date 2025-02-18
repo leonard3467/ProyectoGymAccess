@@ -28,7 +28,7 @@ typedef struct {
 int recuperar_clientes(Cliente clientes[], int max_clientes);
 int obtener_siguiente_id();
 void guardar_cliente(GtkWidget *widget, gpointer data);
-
+void guardar_cliente_sqlite(GtkWidget *widget, gpointer data);
 // 📌 Funciones de validación generales (devuelven bool)
 bool validar_telefono(const char *telefono);
 bool validar_correo(const char *correo);
