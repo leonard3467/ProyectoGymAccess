@@ -12,8 +12,8 @@
 // 📌 Variables globales para los GtkEntry y ComboBox
 static GtkWidget *entry_nombre, *entry_telefono, *entry_correo, *combo_plan, *entry_inicio, *entry_fin;
 static GtkWidget *label_warn_telefono, *label_warn_correo, *label_warn_plan,*label_warn_general;
+/*
 
-// 📌 Función para recuperar clientes desde el archivo "clientes.txt"
 int recuperar_clientes(Cliente clientes[], int max_clientes) {
     FILE *archivo = fopen(ARCHIVO_CLIENTES, "r");
     if (!archivo) {
@@ -40,7 +40,6 @@ int recuperar_clientes(Cliente clientes[], int max_clientes) {
     return contador;
 }
 
-// 📌 Función para obtener el siguiente ID
 int obtener_siguiente_id() {
     FILE *archivo = fopen(ARCHIVO_CLIENTES, "r");
     if (!archivo) {
@@ -60,7 +59,7 @@ int obtener_siguiente_id() {
     fclose(archivo);
     return ultimo_id + 1;
 }
-
+*/
 // 📌 Función para validar el Teléfono (mínimo 10 dígitos)
 bool validar_telefono(const char *telefono) {
     return (strlen(telefono) >= 10);

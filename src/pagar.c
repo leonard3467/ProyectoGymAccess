@@ -34,8 +34,6 @@ char* normalizar_texto(const char *texto) {
     g_free(texto_normalizado);
     return g_string_free(resultado, FALSE);
 }
-
-
 gboolean buscar_cliente(const char *busqueda, Cliente *cliente_encontrado) {
     sqlite3 *db;
     int rc = sqlite3_open("clientes.db", &db);
@@ -92,8 +90,6 @@ gboolean buscar_cliente(const char *busqueda, Cliente *cliente_encontrado) {
         return FALSE;
     }
 }
-
-
 void actualizar_busqueda(GtkWidget *widget, gpointer data) {
     const char *busqueda = gtk_entry_get_text(GTK_ENTRY(entry_busqueda));
     
@@ -112,8 +108,6 @@ void actualizar_busqueda(GtkWidget *widget, gpointer data) {
         gtk_widget_set_visible(box_ficha_cliente, FALSE); // 🔹 Ocultar ficha si no hay resultado
     }
 }
-
-
 GtkWidget* crear_busqueda() {
     GtkWidget *box, *label_busqueda, *entry_box, *icono_busqueda;
     
@@ -195,7 +189,7 @@ GtkWidget* crear_busqueda() {
     return box;
 }
 
-
+// aqui se genera la ventana para poder usar los pagos
 GtkWidget* generar_pago(GtkWidget *parent_window) {
     GtkWidget *box, *busqueda;
 
@@ -362,22 +356,20 @@ void cambiar_plan_callback(GtkWidget *widget, gpointer data) {
 
     // ✅ Actualizar la interfaz con la nueva fecha de fin
     char fecha_fin_text[50];
-    snprintf(fecha_fin_text, sizeof(fecha_fin_text), "%02d/%02d/%04d", day, month, year);
-    gtk_entry_set_text(GTK_ENTRY(label_fin), fecha_fin_text); // ✅ Aplicar cambio a la UI
+    snprintf(fecha_fin_text, sizeof(fecha_fin_text), "<span font='13'>Fecha de Fin: %02d/%02d/%04d</span>", day, month, year);
+    gtk_label_set_markup(GTK_LABEL(label_fin), fecha_fin_text);
+
 
     // ✅ Actualizar el monto a pagar
     int monto_base = g_strcmp0(plan, "Mensual") == 0 ? 400 : 3800;
-    int monto_final = alta ? monto_base + 50 : monto_base;
+    int monto_final = alta ? (monto_base + 50) : monto_base;
 
     gchar *texto_monto = alta
         ? g_strdup_printf("<span font='15' weight='bold' foreground='#9bc09f'>Monto a Pagar: $%d (Incluye $50 por registro)</span>", monto_final)
         : g_strdup_printf("<span font='15' weight='bold' foreground='#9bc09f'>Monto a Pagar: $%d</span>", monto_final);
-
     gtk_label_set_markup(GTK_LABEL(label_monto), texto_monto);
     g_free(texto_monto);
-}
-
-
+    }
 
 void actualizar_fecha_fin_label(const gchar *fecha_inicio, const gchar *plan, GtkWidget *label_fin) {
     int day, month, year;
@@ -396,24 +388,23 @@ void actualizar_fecha_fin_label(const gchar *fecha_inicio, const gchar *plan, Gt
 }
 
 // Función principal para crear la ventana de pago
-void procederPago(GtkWidget *widget, gpointer data) {
+gint procederPago(GtkWidget *widget, gpointer data) {
     Cliente *cliente = (Cliente *)data;
-    gboolean alta = FALSE;// en esat funcon se da por claroq eu no se acba de dar de alta el usuario
-    GtkWidget *dialog = gtk_dialog_new_with_buttons("Procesar Pago",
-                                                    GTK_WINDOW(gtk_widget_get_toplevel(widget)),
-                                                    GTK_DIALOG_MODAL,
-                                                    "_Cancelar", GTK_RESPONSE_CANCEL,
-                                                    NULL);
+    gboolean alta = FALSE; // Indica que es un alta nueva
 
-                                                    
+    // Crear diálogo modal
+    GtkWidget *dialog = gtk_dialog_new();
+    gtk_window_set_title(GTK_WINDOW(dialog), "Procesar Pago");
+    gtk_window_set_modal(GTK_WINDOW(dialog), TRUE);
+    gtk_window_set_default_size(GTK_WINDOW(dialog), 400, 300);
     gtk_widget_set_name(dialog, "dialog-proceder-pago");
 
+    GtkWidget *parent_window = gtk_widget_get_toplevel(widget);
+    if (GTK_IS_WINDOW(parent_window)) {
+        gtk_window_set_transient_for(GTK_WINDOW(dialog), GTK_WINDOW(parent_window));
+        gtk_window_set_position(GTK_WINDOW(dialog), GTK_WIN_POS_CENTER);
+    }
 
-    // Obtener el botón Cancelar del diálogo
-    GtkWidget *btn_cancelar = gtk_dialog_get_widget_for_response(GTK_DIALOG(dialog), GTK_RESPONSE_CANCEL);
-    GtkStyleContext *context_cancelar = gtk_widget_get_style_context(btn_cancelar);
-    gtk_style_context_add_class(context_cancelar, "boton-cancelar");
-    
     GtkWidget *content_area = gtk_dialog_get_content_area(GTK_DIALOG(dialog));
     gtk_widget_set_name(content_area, "content-area-proceder-pago");
 
@@ -421,12 +412,57 @@ void procederPago(GtkWidget *widget, gpointer data) {
     gtk_container_set_border_width(GTK_CONTAINER(box_main), 10);
     gtk_box_pack_start(GTK_BOX(content_area), box_main, TRUE, TRUE, 0);
 
+    // Botones (Cancelar y Pagar)
+    GtkWidget *button_box = gtk_button_box_new(GTK_ORIENTATION_HORIZONTAL);
+    gtk_button_box_set_layout(GTK_BUTTON_BOX(button_box), GTK_BUTTONBOX_CENTER);
+    gtk_box_set_spacing(GTK_BOX(button_box), 20);
+    gtk_box_pack_end(GTK_BOX(box_main), button_box, FALSE, FALSE, 5);
+
+    GtkWidget *btn_cancelar = gtk_button_new_with_label("Cancelar");
+    gtk_widget_set_size_request(btn_cancelar, 120, 40);
+    gtk_style_context_add_class(gtk_widget_get_style_context(btn_cancelar), "boton-cancelar");
+    gtk_box_pack_start(GTK_BOX(button_box), btn_cancelar, FALSE, FALSE, 10);
+    g_signal_connect(btn_cancelar, "clicked", G_CALLBACK(gtk_dialog_response), GINT_TO_POINTER(GTK_RESPONSE_CANCEL));
+
+    GtkWidget *btn_pagar = gtk_button_new_with_label("Pagar");
+    gtk_widget_set_size_request(btn_pagar, 120, 40);
+    gtk_style_context_add_class(gtk_widget_get_style_context(btn_pagar), "boton-pago");
+    gtk_box_pack_start(GTK_BOX(button_box), btn_pagar, FALSE, FALSE, 10);
+    g_signal_connect(btn_pagar, "clicked", G_CALLBACK(gtk_dialog_response), GINT_TO_POINTER(GTK_RESPONSE_ACCEPT));
+
+    // Información del Cliente
     char texto_nombre[150];
     snprintf(texto_nombre, sizeof(texto_nombre), "<span font='16' weight='bold'>%s</span>", cliente->nombre);
     GtkWidget *label_nombre = gtk_label_new(NULL);
     gtk_label_set_markup(GTK_LABEL(label_nombre), texto_nombre);
     gtk_box_pack_start(GTK_BOX(box_main), label_nombre, FALSE, FALSE, 5);
 
+    char texto_inicio[100], texto_fin[100];
+    snprintf(texto_inicio, sizeof(texto_inicio), "<span font='12'>Fecha de Inicio: %s</span>", cliente->fecha_inicio);
+    snprintf(texto_fin, sizeof(texto_fin), "<span font='12'>Fecha de Fin: %s</span>", cliente->fecha_fin);
+
+    GtkWidget *label_inicio = gtk_label_new(NULL);
+    gtk_label_set_markup(GTK_LABEL(label_inicio), texto_inicio);
+    gtk_box_pack_start(GTK_BOX(box_main), label_inicio, FALSE, FALSE, 5);
+
+    // Este label mostrará la fecha de fin y se actualizará si cambia el plan
+    GtkWidget *label_fin = gtk_label_new(NULL);
+    gtk_label_set_markup(GTK_LABEL(label_fin), texto_fin);
+    gtk_box_pack_start(GTK_BOX(box_main), label_fin, FALSE, FALSE, 5);
+
+    // Métodos de Pago
+    GtkWidget *box_pago = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 10);
+    gtk_widget_set_halign(box_pago, GTK_ALIGN_CENTER);
+    gtk_box_pack_start(GTK_BOX(box_main), box_pago, FALSE, FALSE, 5);
+
+    GtkWidget *radio_efectivo = gtk_radio_button_new_with_label(NULL, " Efectivo 💵");
+    gtk_box_pack_start(GTK_BOX(box_pago), radio_efectivo, FALSE, FALSE, 0);
+
+    GtkWidget *radio_tarjeta = gtk_radio_button_new_with_label_from_widget(GTK_RADIO_BUTTON(radio_efectivo), " Tarjeta 💳");
+    gtk_box_pack_start(GTK_BOX(box_pago), radio_tarjeta, FALSE, FALSE, 0);
+
+    // --- Tipo de Plan y Monto a Pagar (modificado para actualizar fecha y monto)
+    // Se reemplaza el comentario incorrecto con //.
     GtkWidget *grid_info = gtk_grid_new();
     gtk_grid_set_row_spacing(GTK_GRID(grid_info), 5);
     gtk_grid_set_column_spacing(GTK_GRID(grid_info), 10);
@@ -446,19 +482,40 @@ void procederPago(GtkWidget *widget, gpointer data) {
     gtk_grid_attach(GTK_GRID(grid_info), btn_cambiar, 2, 0, 1, 1);
     g_signal_connect(btn_cambiar, "clicked", G_CALLBACK(activar_combo_plan), combo_plan);
 
+    // Monto a Pagar
     GtkWidget *label_monto = gtk_label_new(NULL);
-    gtk_label_set_markup(GTK_LABEL(label_monto), strcmp(cliente->tipo_plan, "Anual") == 0 ?
-        "<span font='20' weight='bold' foreground='blue'>Monto a Pagar: $3800</span>" :
-        "<span font='20' weight='bold' foreground='blue'>Monto a Pagar: $400</span>");
+    int monto_base = strcmp(cliente->tipo_plan, "Anual") == 0 ? 3800 : 400;
+
+    gchar *texto_monto = g_strdup_printf(
+        "<span font='15' weight='bold' foreground='#9bc09f'>Monto a Pagar: $%d </span>", 
+        monto_base
+    );
+    gtk_label_set_markup(GTK_LABEL(label_monto), texto_monto);
+    g_free(texto_monto);
     gtk_box_pack_start(GTK_BOX(box_main), label_monto, FALSE, FALSE, 10);
-
-   GtkWidget *widgets[3] = {combo_plan, label_monto, (GtkWidget *)(intptr_t)alta};
+    
+    // Conectar el combo al callback que actualiza la fecha de fin y el monto
+    const gchar *fecha_inicio_str = cliente->fecha_inicio;
+    GtkWidget *widgets[6] = {
+        combo_plan,                             // [0]: Combo de plan
+        label_monto,                            // [1]: Label del monto a pagar
+        label_fin,                              // [2]: Label de fecha de fin
+        (GtkWidget *)(intptr_t)alta,            // [3]: Bandera de alta (convertida a pointer)
+        (GtkWidget *)fecha_inicio_str,          // [4]: Fecha de inicio (cadena)
+        (GtkWidget *)cliente                    // [5]: Cliente
+    };
     g_signal_connect(combo_plan, "changed", G_CALLBACK(cambiar_plan_callback), widgets);
-
+    
+    // NOTA: Se elimina la duplicación del bloque de actualización del label_monto,
+    // ya que éste ya se creó y empacó en box_main.
+    
     gtk_widget_show_all(dialog);
-    gtk_dialog_run(GTK_DIALOG(dialog));
+    gint response = gtk_dialog_run(GTK_DIALOG(dialog));
     gtk_widget_destroy(dialog);
+
+    return response;  
 }
+
 void activar_combo_plan(GtkWidget *widget, gpointer data) {
     GtkWidget *combo_plan = GTK_WIDGET(data);
     gtk_widget_set_sensitive(combo_plan, TRUE);
