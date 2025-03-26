@@ -14,10 +14,10 @@ int main(int argc, char *argv[]) {
     }
     gtk_init(&argc, &argv);
 
-    // Recuperar clientes y mostrarlos en consola
+    /*
     Cliente clientes[MAX_CLIENTES];
     int cantidad = recuperar_clientes(clientes, MAX_CLIENTES);
-
+    */
    
     construir_interfaz();
     gtk_main();
