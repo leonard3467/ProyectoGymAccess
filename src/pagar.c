@@ -35,7 +35,6 @@ char* normalizar_texto(const char *texto) {
     return g_string_free(resultado, FALSE);
 }
 
-
 gboolean buscar_cliente(const char *busqueda, Cliente *cliente_encontrado) {
     sqlite3 *db;
     int rc = sqlite3_open("clientes.db", &db);
