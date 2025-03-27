@@ -1,5 +1,5 @@
-# Compilacion
- gcc -o build/gymaccess     src/main.c     src/interfaz.c     src/sidebar.c     src/clientes.c  src/pagar.c pkg-config --cflags --libs gtk+-3.0
+﻿# Compilacion
+ gcc -o build/gymaccess     src/main.c     src/interfaz.c      gcc -o build/gymaccess src/main.c src/interfaz.c src/sidebar.c src/clientes.c src/pagar.c src/db_setup.c     `pkg-config --cflags --libs gtk+-3.0` -lsqlite3
 # Ejecucion
 ./build/gymaccess
 # Instalación
