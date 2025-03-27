@@ -151,9 +151,7 @@ void guardar_cliente_sqlite(GtkWidget *widget, gpointer data) {
         return;
     }
 
-    // 3) Verificar duplicados (en BD). Puedes omitir esto y capturar el error UNIQUE
-    //    del INSERT, pero aquí un ejemplo con SELECT:
-
+    // 3) Verificar duplicados (en BD)
     sqlite3 *db;
     char *errMsg = NULL;
     int rc = sqlite3_open("clientes.db", &db);
@@ -189,7 +187,6 @@ void guardar_cliente_sqlite(GtkWidget *widget, gpointer data) {
     }
     // Si rc == SQLITE_DONE => no hay duplicado
     sqlite3_finalize(stmt_busqueda);
-    // No cerramos todavía db, la usaremos tras generar_pago
 
     // 4) Crear el struct Cliente en memoria
     Cliente *nuevo_cliente = malloc(sizeof(Cliente));
@@ -199,8 +196,7 @@ void guardar_cliente_sqlite(GtkWidget *widget, gpointer data) {
         return;
     }
 
-    // Asignar valores. (ID no es necesario si en la BD es AUTOINCREMENT).
-    nuevo_cliente->id = 0; // se autogenerará
+    // Asignar valores a los campos del struct
     strncpy(nuevo_cliente->nombre, nombre, sizeof(nuevo_cliente->nombre));
     strncpy(nuevo_cliente->telefono, telefono, sizeof(nuevo_cliente->telefono));
     strncpy(nuevo_cliente->correo,  correo,  sizeof(nuevo_cliente->correo));
@@ -224,19 +220,19 @@ void guardar_cliente_sqlite(GtkWidget *widget, gpointer data) {
         return;
     }
 
-    // 7) Insertar en la BD (pago realizado => saldo_pendiente = 0)
+    // 7) Insertar en la BD si el pago fue realizado (pago realizado => saldo_pendiente = 0)
     nuevo_cliente->saldo_pendiente = 0;
 
-    const char *sql_insert = 
-        "INSERT INTO clientes (nombre, telefono, correo, tipo_plan, fecha_inicio, fecha_fin, "
-        "asistencia_total, saldo_pendiente, meses_adelantados, años_adelantados) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);";
+    // Insertar el cliente en la tabla `clientes`
+    const char *sql_insert_cliente = 
+        "INSERT INTO clientes (nombre, telefono, correo, tipo_plan, fecha_inicio, fecha_fin) "
+        "VALUES (?, ?, ?, ?, ?, ?);";
 
     sqlite3_stmt *stmt_insert;
-    rc = sqlite3_prepare_v2(db, sql_insert, -1, &stmt_insert, NULL);
+    rc = sqlite3_prepare_v2(db, sql_insert_cliente, -1, &stmt_insert, NULL);
     if (rc != SQLITE_OK) {
-        g_print("❌ Error al preparar INSERT: %s\n", sqlite3_errmsg(db));
-        free(nuevo_cliente);
+        g_print("❌ Error al preparar el INSERT para cliente: %s\n", sqlite3_errmsg(db));
+        sqlite3_finalize(stmt_insert);
         sqlite3_close(db);
         return;
     }
@@ -247,28 +243,46 @@ void guardar_cliente_sqlite(GtkWidget *widget, gpointer data) {
     sqlite3_bind_text(stmt_insert, 4, nuevo_cliente->tipo_plan, -1, SQLITE_STATIC);
     sqlite3_bind_text(stmt_insert, 5, nuevo_cliente->fecha_inicio, -1, SQLITE_STATIC);
     sqlite3_bind_text(stmt_insert, 6, nuevo_cliente->fecha_fin, -1, SQLITE_STATIC);
-    sqlite3_bind_int(stmt_insert,  7, nuevo_cliente->asistencia_total);
-    sqlite3_bind_int(stmt_insert,  8, nuevo_cliente->saldo_pendiente);
-    sqlite3_bind_int(stmt_insert,  9, nuevo_cliente->meses_adelantados);
-    sqlite3_bind_int(stmt_insert, 10, nuevo_cliente->años_adelantados);
 
     rc = sqlite3_step(stmt_insert);
     if (rc != SQLITE_DONE) {
-        g_print("❌ Error al insertar el cliente: %s\n", sqlite3_errmsg(db));
-        gtk_label_set_markup(GTK_LABEL(label_warn_general),
-            "<span foreground='#ff4d4d'><b>⚠️ Error al insertar en la BD</b></span>");
-    } else {
-        g_print("✔️ Cliente registrado exitosamente en la base de datos.\n");
-        gtk_label_set_text(GTK_LABEL(label_warn_general),
-            "✔️ Cliente registrado con éxito y pago realizado (en la BD).");
+        g_print("❌ Error al insertar cliente en la BD: %s\n", sqlite3_errmsg(db));
+        sqlite3_finalize(stmt_insert);
+        sqlite3_close(db);
+        return;
     }
 
+    // Obtener el id del cliente recién insertado
+    int cliente_id = sqlite3_last_insert_rowid(db); 
     sqlite3_finalize(stmt_insert);
-    sqlite3_close(db);
 
-    // 8) Liberar memoria del struct
-    free(nuevo_cliente);
+    // 8) Insertar el pago del cliente en la tabla `pago_cliente`
+    const char *sql_insert_pago = 
+        "INSERT INTO pago_cliente (cliente_id, saldo_pendiente, meses_adelantados, años_adelantados) "
+        "VALUES (?, 0, 0, 0);";  // Inicializamos valores para el pago
+
+    sqlite3_stmt *stmt_insert_pago;
+    rc = sqlite3_prepare_v2(db, sql_insert_pago, -1, &stmt_insert_pago, NULL);
+    sqlite3_bind_int(stmt_insert_pago, 1, cliente_id);  // Usamos el cliente_id recién insertado
+
+    rc = sqlite3_step(stmt_insert_pago);
+    if (rc != SQLITE_DONE) {
+        g_print("❌ Error al insertar pago en la BD: %s\n", sqlite3_errmsg(db));
+        sqlite3_finalize(stmt_insert_pago);
+        sqlite3_close(db);
+        return;
+    }
+    sqlite3_finalize(stmt_insert_pago);
+
+    // 9) Confirmación
+    gtk_label_set_text(GTK_LABEL(label_warn_general),
+        "✔️ Cliente registrado con éxito y pago realizado (en la BD).");
+
+    // 10) Liberar recursos
+    sqlite3_close(db);
+    free(nuevo_cliente);  // Liberar la memoria del struct Cliente
 }
+
 
 
 void abrir_calendario(GtkWidget *widget, gpointer data) {

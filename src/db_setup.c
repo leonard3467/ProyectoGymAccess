@@ -15,7 +15,7 @@ int inicializar_base_datos() {
         return 1;
     }
 
-    // Crear la tabla de clientes 
+    // Crear la tabla de clientes (solo con los datos básicos)
     const char *sql_clientes = 
         "CREATE TABLE IF NOT EXISTS clientes ("
         "id INTEGER PRIMARY KEY AUTOINCREMENT, "
@@ -24,15 +24,8 @@ int inicializar_base_datos() {
         "correo TEXT UNIQUE NOT NULL, "
         "tipo_plan TEXT NOT NULL, "
         "fecha_inicio DATE NOT NULL, "
-        "fecha_fin DATE NOT NULL, "
-        "asistencia_total INTEGER DEFAULT 0, "
-        "saldo_pendiente BOOLEAN DEFAULT 1, "
-        "meses_adelantados INTEGER DEFAULT 0, "
-        "años_adelantados INTEGER DEFAULT 0"
+        "fecha_fin DATE NOT NULL"
         ");";
-    //en un futuro seria util hacer una relaional con los paos y las asistencias,pro medio del id se genere el pago en una entidad aparte
-    //y en otra tabal se cuarde oda la informacion de sus asistencias en la semana, desde el conteo, hasya una feca con cuantos dias a asistido
-
 
     // Ejecutar la creación de la tabla clientes
     rc = sqlite3_exec(db, sql_clientes, 0, 0, &errMsg);
@@ -45,7 +38,30 @@ int inicializar_base_datos() {
         printf("Tabla 'clientes' creada correctamente o ya existente.\n");
     }
 
+    // Crear la tabla de pago_cliente (para detalles de pago y plan)
+    const char *sql_pago_cliente = 
+        "CREATE TABLE IF NOT EXISTS pago_cliente ("
+        "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+        "cliente_id INTEGER NOT NULL, "
+        "saldo_pendiente BOOLEAN DEFAULT 1, "
+        "meses_adelantados INTEGER DEFAULT 0, "
+        "años_adelantados INTEGER DEFAULT 0, "
+        "FOREIGN KEY(cliente_id) REFERENCES clientes(id)"
+        ");";
+
+    // Ejecutar la creación de la tabla pago_cliente
+    rc = sqlite3_exec(db, sql_pago_cliente, 0, 0, &errMsg);
+    if (rc != SQLITE_OK) {
+        printf("Error al crear la tabla 'pago_cliente': %s\n", errMsg);
+        sqlite3_free(errMsg);
+        sqlite3_close(db);
+        return 2;
+    } else {
+        printf("Tabla 'pago_cliente' creada correctamente o ya existente.\n");
+    }
+
     sqlite3_close(db);
     printf("Base de datos inicializada con éxito.\n");
     return 0;
 }
+

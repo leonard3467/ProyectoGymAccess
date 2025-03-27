@@ -44,11 +44,13 @@ gboolean buscar_cliente(const char *busqueda, Cliente *cliente_encontrado) {
         return FALSE;
     }
 
+    // Nueva consulta para buscar en ambas tablas clientes y pago_cliente
     const char *sql = 
-        "SELECT id, nombre, telefono, correo, tipo_plan, fecha_inicio, fecha_fin, "
-        "asistencia_total, saldo_pendiente, meses_adelantados, años_adelantados "
-        "FROM clientes "
-        "WHERE id = ? OR nombre LIKE ? OR telefono = ? OR correo = ? LIMIT 1;";
+        "SELECT c.id, c.nombre, c.telefono, c.correo, c.tipo_plan, c.fecha_inicio, c.fecha_fin, "
+        "p.saldo_pendiente, p.meses_adelantados, p.años_adelantados "
+        "FROM clientes c "
+        "JOIN pago_cliente p ON c.id = p.cliente_id "
+        "WHERE c.id = ? OR c.nombre LIKE ? OR c.telefono = ? OR c.correo = ? LIMIT 1;";
 
     sqlite3_stmt *stmt;
     rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
@@ -77,10 +79,9 @@ gboolean buscar_cliente(const char *busqueda, Cliente *cliente_encontrado) {
         strncpy(cliente_encontrado->tipo_plan, (const char *)sqlite3_column_text(stmt, 4), sizeof(cliente_encontrado->tipo_plan));
         strncpy(cliente_encontrado->fecha_inicio, (const char *)sqlite3_column_text(stmt, 5), sizeof(cliente_encontrado->fecha_inicio));
         strncpy(cliente_encontrado->fecha_fin, (const char *)sqlite3_column_text(stmt, 6), sizeof(cliente_encontrado->fecha_fin));
-        cliente_encontrado->asistencia_total = sqlite3_column_int(stmt, 7);
-        cliente_encontrado->saldo_pendiente = sqlite3_column_int(stmt, 8);
-        cliente_encontrado->meses_adelantados = sqlite3_column_int(stmt, 9);
-        cliente_encontrado->años_adelantados = sqlite3_column_int(stmt, 10);
+        cliente_encontrado->saldo_pendiente = sqlite3_column_int(stmt, 7);
+        cliente_encontrado->meses_adelantados = sqlite3_column_int(stmt, 8);
+        cliente_encontrado->años_adelantados = sqlite3_column_int(stmt, 9);
 
         sqlite3_finalize(stmt);
         sqlite3_close(db);
@@ -91,6 +92,7 @@ gboolean buscar_cliente(const char *busqueda, Cliente *cliente_encontrado) {
         return FALSE;
     }
 }
+
 void actualizar_busqueda(GtkWidget *widget, gpointer data) {
     const char *busqueda = gtk_entry_get_text(GTK_ENTRY(entry_busqueda));
     
