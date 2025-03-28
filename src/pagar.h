@@ -19,7 +19,7 @@ GtkWidget* generar_pago(GtkWidget *parent_window);
 
 void actualizar_ficha_cliente(Cliente *cliente);
 void cambiar_plan_callback(GtkWidget *widget, gpointer data);
-gint procederPago(GtkWidget *widget, gpointer data);
+void procederPago(GtkWidget *widget, gpointer data);
 void activar_combo_plan(GtkWidget *widget, gpointer data);
 void actualizar_fecha_fin_label(const gchar *fecha_inicio, const gchar *plan, GtkWidget *label_fin);
 

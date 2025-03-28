@@ -236,50 +236,50 @@ void actualizar_ficha_cliente(Cliente *cliente) {
         return;
     }
 
-    // 📌 Limpiar la ficha anterior
+    // Limpiar la ficha anterior
     gtk_container_foreach(GTK_CONTAINER(box_ficha_cliente), (GtkCallback)gtk_widget_destroy, NULL);
     gtk_widget_set_no_show_all(box_ficha_cliente, FALSE);
     gtk_widget_show(box_ficha_cliente);
 
     GtkWidget *info_box, *label_nombre, *label_plan, *label_vencimiento, *label_saldo, *label_cuota_vencida, *btn_pagar, *icono_carrito;
 
-    // 📌 Contenedor de la ficha con un tamaño más pequeño
+    // Contenedor de la ficha con un tamaño más pequeño
     info_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 5);
     gtk_widget_set_name(info_box, "ficha-info");
 
-    // 📌 Establecer tamaño de la ficha (400px de ancho máximo)
+    // Establecer tamaño de la ficha
     gtk_widget_set_size_request(info_box, 400, -1);
     gtk_widget_set_halign(info_box, GTK_ALIGN_CENTER); // Centrar en la ventana
 
-    // 📌 Nombre del cliente
+    // Nombre del cliente
     char texto_nombre[100];
     snprintf(texto_nombre, sizeof(texto_nombre), "<span font='14' weight='bold'>%s</span>", cliente->nombre);
     label_nombre = gtk_label_new(NULL);
     gtk_label_set_markup(GTK_LABEL(label_nombre), texto_nombre);
     gtk_widget_set_halign(label_nombre, GTK_ALIGN_CENTER);
 
-    // 📌 Tipo de plan
+    // Tipo de plan
     char texto_plan[100];
     snprintf(texto_plan, sizeof(texto_plan), "<span font='12'>Plan: %s</span>", cliente->tipo_plan);
     label_plan = gtk_label_new(NULL);
     gtk_label_set_markup(GTK_LABEL(label_plan), texto_plan);
     gtk_widget_set_halign(label_plan, GTK_ALIGN_CENTER);
 
-    // 📌 Vencimiento
+    // Vencimiento
     char texto_vencimiento[100];
     snprintf(texto_vencimiento, sizeof(texto_vencimiento), "<span font='12'>Vencimiento: %s</span>", cliente->fecha_fin);
     label_vencimiento = gtk_label_new(NULL);
     gtk_label_set_markup(GTK_LABEL(label_vencimiento), texto_vencimiento);
     gtk_widget_set_halign(label_vencimiento, GTK_ALIGN_CENTER);
 
-    // 📌 Saldo pendiente
+    // Saldo pendiente
     char texto_saldo[100];
     snprintf(texto_saldo, sizeof(texto_saldo), "<span font='12'>Saldo pendiente: %d</span>", cliente->saldo_pendiente);
     label_saldo = gtk_label_new(NULL);
     gtk_label_set_markup(GTK_LABEL(label_saldo), texto_saldo);
     gtk_widget_set_halign(label_saldo, GTK_ALIGN_CENTER);
 
-    // 📌 Mostrar "CUOTA VENCIDA" si el saldo es mayor a 0
+    // Mostrar "CUOTA VENCIDA" si el saldo es mayor a 0
     if (cliente->saldo_pendiente > 0) {
         label_cuota_vencida = gtk_label_new(NULL);
         gtk_label_set_markup(GTK_LABEL(label_cuota_vencida), "<span font='14' foreground='red' weight='bold'>CUOTA VENCIDA</span>");
@@ -295,38 +295,37 @@ void actualizar_ficha_cliente(Cliente *cliente) {
     }
     *cliente_copia = *cliente;  // Copia todos los campos sin casteos
 
-    // 📌 Botón de pago más pequeño y centrado
+    // Botón de pago más pequeño y centrado
     btn_pagar = gtk_button_new_with_label(" Pagar");
 
-    // 📌 Aplicar estilo CSS con una clase
+    // Aplicar estilo CSS con una clase
     GtkStyleContext *context = gtk_widget_get_style_context(btn_pagar);
     gtk_style_context_add_class(context, "boton-pago");
 
-    // 📌 Reducir tamaño del botón (igual que el de alta)
+    // Reducir tamaño del botón
     gtk_widget_set_size_request(btn_pagar, 150, 40);
     gtk_widget_set_halign(btn_pagar, GTK_ALIGN_CENTER);
 
     // Conectar la señal "clicked" al callback proceder_pago, pasando la copia dinámica del Cliente
     g_signal_connect(btn_pagar, "clicked", G_CALLBACK(procederPago), cliente_copia);
-    // 📌 Agregar icono de carrito en el botón
+    // Agregar icono de carrito en el botón
     icono_carrito = gtk_image_new_from_icon_name("emblem-money", GTK_ICON_SIZE_BUTTON);
     gtk_button_set_image(GTK_BUTTON(btn_pagar), icono_carrito);
 
-
-
-    // 📌 Agregar widgets al contenedor
+    // Agregar widgets al contenedor
     gtk_box_pack_start(GTK_BOX(info_box), label_nombre, FALSE, FALSE, 0);
     gtk_box_pack_start(GTK_BOX(info_box), label_plan, FALSE, FALSE, 0);
     gtk_box_pack_start(GTK_BOX(info_box), label_vencimiento, FALSE, FALSE, 0);
     gtk_box_pack_start(GTK_BOX(info_box), label_saldo, FALSE, FALSE, 0);
     gtk_box_pack_start(GTK_BOX(info_box), btn_pagar, FALSE, FALSE, 10); // Agregar espacio debajo
 
-    // 📌 Agregar la ficha al contenedor principal
+    // Agregar la ficha al contenedor principal
     gtk_box_pack_start(GTK_BOX(box_ficha_cliente), info_box, FALSE, FALSE, 0);
 
-    // 📌 Mostrar la ficha con todos sus elementos
+    // Mostrar la ficha con todos sus elementos
     gtk_widget_show_all(box_ficha_cliente);
 }
+
 void cambiar_plan_callback(GtkWidget *widget, gpointer data) {
     GtkWidget **widgets = (GtkWidget **)data;
     GtkWidget *combo_plan = widgets[0];
@@ -391,22 +390,27 @@ void actualizar_fecha_fin_label(const gchar *fecha_inicio, const gchar *plan, Gt
 }
 
 // Función principal para crear la ventana de pago
-gint procederPago(GtkWidget *widget, gpointer data) {
+void procederPago(GtkWidget *widget, gpointer data) {
     Cliente *cliente = (Cliente *)data;
-    gboolean alta = FALSE; // Indica que es un alta nueva
+    gboolean alta = FALSE; // Indica que no es un alta nueva
+    GtkWidget *dialog = gtk_dialog_new_with_buttons("Procesar Pago",
+                                                    GTK_WINDOW(gtk_widget_get_toplevel(widget)),
+                                                    GTK_DIALOG_MODAL,
+                                                    "_Cancelar", GTK_RESPONSE_CANCEL,
+                                                    "_Pagar", GTK_RESPONSE_ACCEPT,
+                                                    NULL);
 
-    // Crear diálogo modal
-    GtkWidget *dialog = gtk_dialog_new();
-    gtk_window_set_title(GTK_WINDOW(dialog), "Procesar Pago");
-    gtk_window_set_modal(GTK_WINDOW(dialog), TRUE);
-    gtk_window_set_default_size(GTK_WINDOW(dialog), 400, 300);
+    // Verificamos que el diálogo es válido
+    if (!GTK_IS_DIALOG(dialog)) {
+        g_warning("El diálogo no es válido.");
+        return;
+    }
+
     gtk_widget_set_name(dialog, "dialog-proceder-pago");
 
-    GtkWidget *parent_window = gtk_widget_get_toplevel(widget);
-    if (GTK_IS_WINDOW(parent_window)) {
-        gtk_window_set_transient_for(GTK_WINDOW(dialog), GTK_WINDOW(parent_window));
-        gtk_window_set_position(GTK_WINDOW(dialog), GTK_WIN_POS_CENTER);
-    }
+    GtkWidget *btn_cancelar = gtk_dialog_get_widget_for_response(GTK_DIALOG(dialog), GTK_RESPONSE_CANCEL);
+    GtkStyleContext *context_cancelar = gtk_widget_get_style_context(btn_cancelar);
+    gtk_style_context_add_class(context_cancelar, "boton-cancelar");
 
     GtkWidget *content_area = gtk_dialog_get_content_area(GTK_DIALOG(dialog));
     gtk_widget_set_name(content_area, "content-area-proceder-pago");
@@ -414,24 +418,6 @@ gint procederPago(GtkWidget *widget, gpointer data) {
     GtkWidget *box_main = gtk_box_new(GTK_ORIENTATION_VERTICAL, 10);
     gtk_container_set_border_width(GTK_CONTAINER(box_main), 10);
     gtk_box_pack_start(GTK_BOX(content_area), box_main, TRUE, TRUE, 0);
-
-    // Botones (Cancelar y Pagar)
-    GtkWidget *button_box = gtk_button_box_new(GTK_ORIENTATION_HORIZONTAL);
-    gtk_button_box_set_layout(GTK_BUTTON_BOX(button_box), GTK_BUTTONBOX_CENTER);
-    gtk_box_set_spacing(GTK_BOX(button_box), 20);
-    gtk_box_pack_end(GTK_BOX(box_main), button_box, FALSE, FALSE, 5);
-
-    GtkWidget *btn_cancelar = gtk_button_new_with_label("Cancelar");
-    gtk_widget_set_size_request(btn_cancelar, 120, 40);
-    gtk_style_context_add_class(gtk_widget_get_style_context(btn_cancelar), "boton-cancelar");
-    gtk_box_pack_start(GTK_BOX(button_box), btn_cancelar, FALSE, FALSE, 10);
-    g_signal_connect(btn_cancelar, "clicked", G_CALLBACK(gtk_dialog_response), GINT_TO_POINTER(GTK_RESPONSE_CANCEL));
-
-    GtkWidget *btn_pagar = gtk_button_new_with_label("Pagar");
-    gtk_widget_set_size_request(btn_pagar, 120, 40);
-    gtk_style_context_add_class(gtk_widget_get_style_context(btn_pagar), "boton-pago");
-    gtk_box_pack_start(GTK_BOX(button_box), btn_pagar, FALSE, FALSE, 10);
-    g_signal_connect(btn_pagar, "clicked", G_CALLBACK(gtk_dialog_response), GINT_TO_POINTER(GTK_RESPONSE_ACCEPT));
 
     // Información del Cliente
     char texto_nombre[150];
@@ -514,9 +500,15 @@ gint procederPago(GtkWidget *widget, gpointer data) {
     
     gtk_widget_show_all(dialog);
     gint response = gtk_dialog_run(GTK_DIALOG(dialog));
-    gtk_widget_destroy(dialog);
+    if (response == GTK_RESPONSE_ACCEPT) {
+        // Acción de pago exitosa
+        g_print("Pago realizado con éxito\n");
+    } else {
+        // Si el usuario canceló
+        g_print("Pago cancelado\n");
+    }
 
-    return response;  
+    gtk_widget_destroy(dialog);  // Asegúrate de destruir el diálogo al final
 }
 
 void activar_combo_plan(GtkWidget *widget, gpointer data) {
