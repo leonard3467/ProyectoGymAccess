@@ -8,58 +8,13 @@
 #include <time.h>
 #include <glib.h>  // expresiones regulares
 #include <sqlite3.h>  // usaremos esta libreria paara cambiar el .txt por una base de datos local
+#include <windows.h>
+#include "asistencia.h"
 
 // 📌 Variables globales para los GtkEntry y ComboBox
 static GtkWidget *entry_nombre, *entry_telefono, *entry_correo, *combo_plan, *entry_inicio, *entry_fin;
 static GtkWidget *label_warn_telefono, *label_warn_correo, *label_warn_plan,*label_warn_general;
-/*
 
-int recuperar_clientes(Cliente clientes[], int max_clientes) {
-    FILE *archivo = fopen(ARCHIVO_CLIENTES, "r");
-    if (!archivo) {
-        printf("No se pudo abrir el archivo de clientes.\n");
-        return 0;
-    }
-
-    int contador = 0;
-    char buffer[1024];
-
-    while (fgets(buffer, sizeof(buffer), archivo) && contador < max_clientes) {
-        Cliente *c = &clientes[contador];
-
-        sscanf(buffer, "%d|%49[^|]|%14[^|]|%49[^|]|%19[^|]|%10[^|]|%10[^|]|%d|%d|%d|%d",
-            &c->id, c->nombre, c->telefono, c->correo, c->tipo_plan,
-            c->fecha_inicio, c->fecha_fin, &c->asistencia_total, &c->saldo_pendiente,
-            &c->meses_adelantados, &c->años_adelantados);
-
-
-        contador++;
-    }
-
-    fclose(archivo);
-    return contador;
-}
-
-int obtener_siguiente_id() {
-    FILE *archivo = fopen(ARCHIVO_CLIENTES, "r");
-    if (!archivo) {
-        return 1;
-    }
-
-    int id, ultimo_id = 0;
-    char buffer[256];
-
-    while (fgets(buffer, sizeof(buffer), archivo)) {
-        sscanf(buffer, "%d|", &id);
-        if (id > ultimo_id) {
-            ultimo_id = id;
-        }
-    }
-
-    fclose(archivo);
-    return ultimo_id + 1;
-}
-*/
 // 📌 Función para validar el Teléfono (mínimo 10 dígitos)
 bool validar_telefono(const char *telefono) {
     return (strlen(telefono) >= 10);
@@ -123,7 +78,7 @@ void actualizar_validacion_correo(GtkWidget *widget, gpointer data) {
 
 
 void guardar_cliente_sqlite(GtkWidget *widget, gpointer data) {
-    // 1) Leer campos de los GtkEntry
+    // 1) Leer campos del formulario
     const char *nombre = gtk_entry_get_text(GTK_ENTRY(entry_nombre));
     const char *telefono = gtk_entry_get_text(GTK_ENTRY(entry_telefono));
     const char *correo = gtk_entry_get_text(GTK_ENTRY(entry_correo));
@@ -131,7 +86,7 @@ void guardar_cliente_sqlite(GtkWidget *widget, gpointer data) {
     const char *inicio = gtk_entry_get_text(GTK_ENTRY(entry_inicio));
     const char *fin = gtk_entry_get_text(GTK_ENTRY(entry_fin));
 
-    // 2) Validaciones antes de guardar
+    // 2) Validaciones básicas
     if (strlen(nombre) == 0 || strlen(telefono) == 0 || strlen(correo) == 0 ||
         plan == NULL || strlen(inicio) == 0 || strlen(fin) == 0) {
         gtk_label_set_markup(GTK_LABEL(label_warn_general),
@@ -151,137 +106,166 @@ void guardar_cliente_sqlite(GtkWidget *widget, gpointer data) {
         return;
     }
 
-    // 3) Verificar duplicados (en BD)
+    // 3) Verificar duplicados de teléfono/correo
     sqlite3 *db;
-    char *errMsg = NULL;
-    int rc = sqlite3_open("clientes.db", &db);
-    if (rc != SQLITE_OK) {
+    if (sqlite3_open("clientes.db", &db) != SQLITE_OK) {
         g_print("❌ Error al abrir la base de datos: %s\n", sqlite3_errmsg(db));
-        sqlite3_close(db);
         return;
     }
 
-    // Consulta para ver si teléfono o correo ya existen
-    const char *sql_busqueda = 
-        "SELECT 1 FROM clientes WHERE telefono = ? OR correo = ? LIMIT 1;";
+    const char *sql_busqueda = "SELECT 1 FROM clientes WHERE telefono = ? OR correo = ? LIMIT 1;";
     sqlite3_stmt *stmt_busqueda;
-    rc = sqlite3_prepare_v2(db, sql_busqueda, -1, &stmt_busqueda, NULL);
-    if (rc != SQLITE_OK) {
-        g_print("❌ Error al preparar la consulta de duplicados: %s\n", sqlite3_errmsg(db));
+    if (sqlite3_prepare_v2(db, sql_busqueda, -1, &stmt_busqueda, NULL) != SQLITE_OK) {
+        g_print("❌ Error al preparar consulta de duplicados: %s\n", sqlite3_errmsg(db));
         sqlite3_close(db);
         return;
     }
 
-    // Bind de parámetros (teléfono, correo)
     sqlite3_bind_text(stmt_busqueda, 1, telefono, -1, SQLITE_STATIC);
-    sqlite3_bind_text(stmt_busqueda, 2, correo,   -1, SQLITE_STATIC);
+    sqlite3_bind_text(stmt_busqueda, 2, correo, -1, SQLITE_STATIC);
 
-    rc = sqlite3_step(stmt_busqueda);
-    if (rc == SQLITE_ROW) {
-        // Significa que encontró un registro => duplicado
+    if (sqlite3_step(stmt_busqueda) == SQLITE_ROW) {
         gtk_label_set_markup(GTK_LABEL(label_warn_general),
             "<span foreground='#ff4d4d'><b>⚠️ El teléfono o correo ya fue dado de alta.</b></span>");
         sqlite3_finalize(stmt_busqueda);
         sqlite3_close(db);
         return;
     }
-    // Si rc == SQLITE_DONE => no hay duplicado
     sqlite3_finalize(stmt_busqueda);
+    sqlite3_close(db);  // Cerramos aquí porque abriremos nueva conexión en el callback
 
-    // 4) Crear el struct Cliente en memoria
+    // 4) Crear struct Cliente en memoria
     Cliente *nuevo_cliente = malloc(sizeof(Cliente));
     if (!nuevo_cliente) {
-        g_print("❌ Error: no se pudo asignar memoria para el cliente\n");
-        sqlite3_close(db);
+        g_print("❌ Error al reservar memoria para cliente.\n");
         return;
     }
 
-    // Asignar valores a los campos del struct
     strncpy(nuevo_cliente->nombre, nombre, sizeof(nuevo_cliente->nombre));
     strncpy(nuevo_cliente->telefono, telefono, sizeof(nuevo_cliente->telefono));
-    strncpy(nuevo_cliente->correo,  correo,  sizeof(nuevo_cliente->correo));
-    strncpy(nuevo_cliente->tipo_plan, plan,  sizeof(nuevo_cliente->tipo_plan));
+    strncpy(nuevo_cliente->correo, correo, sizeof(nuevo_cliente->correo));
+    strncpy(nuevo_cliente->tipo_plan, plan, sizeof(nuevo_cliente->tipo_plan));
     strncpy(nuevo_cliente->fecha_inicio, inicio, sizeof(nuevo_cliente->fecha_inicio));
-    strncpy(nuevo_cliente->fecha_fin,    fin,    sizeof(nuevo_cliente->fecha_fin));
-    nuevo_cliente->asistencia_total  = 0;
-    nuevo_cliente->saldo_pendiente  = 1;  // al inicio 1 => “tiene que pagar”
-    nuevo_cliente->meses_adelantados= 0;
+    strncpy(nuevo_cliente->fecha_fin, fin, sizeof(nuevo_cliente->fecha_fin));
+    nuevo_cliente->asistencia_total = 0;
+    nuevo_cliente->saldo_pendiente = 1;
+    nuevo_cliente->meses_adelantados = 0;
     nuevo_cliente->años_adelantados = 0;
 
-    // 5) Abrir ventana de pago
-    gint response = generar_pago_alta(widget, nuevo_cliente);
+    // 5) Activar lectura NFC
+    extern void activar_modo_lectura_escritura();
+    activar_modo_lectura_escritura();
 
-    // 6) Si el usuario canceló el pago
-    if (response == GTK_RESPONSE_CANCEL || response == GTK_RESPONSE_DELETE_EVENT) {
-        gtk_label_set_markup(GTK_LABEL(label_warn_general),
-            "<span foreground='#ff4d4d'><b>⚠️ Cliente no registrado porque no se realizó el pago.</b></span>");
-        free(nuevo_cliente);
-        sqlite3_close(db);
+    gtk_label_set_markup(GTK_LABEL(label_warn_general),
+        "<span foreground='#aaaaff'><b>⌛ Acerca una tarjeta NFC para vincular al cliente...</b></span>");
+
+    // 6) Crear estructura auxiliar para manejar la espera del NFC
+    EsperaNFCData *info = malloc(sizeof(EsperaNFCData));
+    info->widget = widget;
+    info->cliente = nuevo_cliente;
+    info->intentos = 0;
+
+    if (sqlite3_open("clientes.db", &info->db) != SQLITE_OK) {
+        g_print("❌ Error al abrir base de datos en espera NFC.\n");
+        free(info->cliente);
+        free(info);
         return;
     }
 
-    // 7) Insertar en la BD si el pago fue realizado (pago realizado => saldo_pendiente = 0)
-    nuevo_cliente->saldo_pendiente = 0;
-
-    // Insertar el cliente en la tabla `clientes`
-    const char *sql_insert_cliente = 
-        "INSERT INTO clientes (nombre, telefono, correo, tipo_plan, fecha_inicio, fecha_fin) "
-        "VALUES (?, ?, ?, ?, ?, ?);";
-
-    sqlite3_stmt *stmt_insert;
-    rc = sqlite3_prepare_v2(db, sql_insert_cliente, -1, &stmt_insert, NULL);
-    if (rc != SQLITE_OK) {
-        g_print("❌ Error al preparar el INSERT para cliente: %s\n", sqlite3_errmsg(db));
-        sqlite3_finalize(stmt_insert);
-        sqlite3_close(db);
-        return;
-    }
-
-    sqlite3_bind_text(stmt_insert, 1, nuevo_cliente->nombre, -1, SQLITE_STATIC);
-    sqlite3_bind_text(stmt_insert, 2, nuevo_cliente->telefono, -1, SQLITE_STATIC);
-    sqlite3_bind_text(stmt_insert, 3, nuevo_cliente->correo, -1, SQLITE_STATIC);
-    sqlite3_bind_text(stmt_insert, 4, nuevo_cliente->tipo_plan, -1, SQLITE_STATIC);
-    sqlite3_bind_text(stmt_insert, 5, nuevo_cliente->fecha_inicio, -1, SQLITE_STATIC);
-    sqlite3_bind_text(stmt_insert, 6, nuevo_cliente->fecha_fin, -1, SQLITE_STATIC);
-
-    rc = sqlite3_step(stmt_insert);
-    if (rc != SQLITE_DONE) {
-        g_print("❌ Error al insertar cliente en la BD: %s\n", sqlite3_errmsg(db));
-        sqlite3_finalize(stmt_insert);
-        sqlite3_close(db);
-        return;
-    }
-
-    // Obtener el id del cliente recién insertado
-    int cliente_id = sqlite3_last_insert_rowid(db); 
-    sqlite3_finalize(stmt_insert);
-
-    // 8) Insertar el pago del cliente en la tabla `pago_cliente`
-    const char *sql_insert_pago = 
-        "INSERT INTO pago_cliente (cliente_id, saldo_pendiente, meses_adelantados, años_adelantados) "
-        "VALUES (?, 0, 0, 0);";  // Inicializamos valores para el pago
-
-    sqlite3_stmt *stmt_insert_pago;
-    rc = sqlite3_prepare_v2(db, sql_insert_pago, -1, &stmt_insert_pago, NULL);
-    sqlite3_bind_int(stmt_insert_pago, 1, cliente_id);  // Usamos el cliente_id recién insertado
-
-    rc = sqlite3_step(stmt_insert_pago);
-    if (rc != SQLITE_DONE) {
-        g_print("❌ Error al insertar pago en la BD: %s\n", sqlite3_errmsg(db));
-        sqlite3_finalize(stmt_insert_pago);
-        sqlite3_close(db);
-        return;
-    }
-    sqlite3_finalize(stmt_insert_pago);
-
-    // 9) Confirmación
-    gtk_label_set_text(GTK_LABEL(label_warn_general),
-        "✔️ Cliente registrado con éxito y pago realizado (en la BD).");
-
-    // 10) Liberar recursos
-    sqlite3_close(db);
-    free(nuevo_cliente);  // Liberar la memoria del struct Cliente
+    // 7) Iniciar espera asincrónica (no bloqueante)
+    g_timeout_add(100, verificar_nfc_async, info);
 }
+
+
+
+gboolean verificar_nfc_async(gpointer data) {
+    EsperaNFCData *info = (EsperaNFCData *)data;
+    const char *id_nfc = obtener_id_nfc();
+
+    if (strlen(id_nfc) > 0) {
+        g_print("ID NFC recibido desde clientes .c: %s\n", id_nfc);
+
+        // Verificar si ya está en asistencia
+        sqlite3_stmt *stmt_check_nfc;
+        const char *sql_check_nfc = "SELECT cliente_id FROM asistencia WHERE id_nfc = ?";
+        sqlite3_prepare_v2(info->db, sql_check_nfc, -1, &stmt_check_nfc, NULL);
+        sqlite3_bind_text(stmt_check_nfc, 1, id_nfc, -1, SQLITE_STATIC);
+
+        if (sqlite3_step(stmt_check_nfc) == SQLITE_ROW) {
+            gtk_label_set_markup(GTK_LABEL(label_warn_general),
+                "<span foreground='#ff4d4d'><b>⚠️ Esta tarjeta NFC ya está registrada.</b></span>");
+            sqlite3_finalize(stmt_check_nfc);
+            sqlite3_close(info->db);
+            free(info->cliente);
+            free(info);
+            return FALSE;
+        }
+        sqlite3_finalize(stmt_check_nfc);
+
+        // Mostrar ventana de pago
+        gint response = generar_pago_alta(info->widget, info->cliente);
+        if (response == GTK_RESPONSE_CANCEL || response == GTK_RESPONSE_DELETE_EVENT) {
+            gtk_label_set_markup(GTK_LABEL(label_warn_general),
+                "<span foreground='#ff4d4d'><b>⚠️ Cliente no registrado. Pago cancelado.</b></span>");
+            sqlite3_close(info->db);
+            free(info->cliente);
+            free(info);
+            return FALSE;
+        }
+
+        // Insertar cliente en tabla clientes
+        const char *sql_insert_cliente = 
+            "INSERT INTO clientes (nombre, telefono, correo, tipo_plan, fecha_inicio, fecha_fin) "
+            "VALUES (?, ?, ?, ?, ?, ?);";
+        sqlite3_stmt *stmt_insert;
+        sqlite3_prepare_v2(info->db, sql_insert_cliente, -1, &stmt_insert, NULL);
+        sqlite3_bind_text(stmt_insert, 1, info->cliente->nombre, -1, SQLITE_STATIC);
+        sqlite3_bind_text(stmt_insert, 2, info->cliente->telefono, -1, SQLITE_STATIC);
+        sqlite3_bind_text(stmt_insert, 3, info->cliente->correo, -1, SQLITE_STATIC);
+        sqlite3_bind_text(stmt_insert, 4, info->cliente->tipo_plan, -1, SQLITE_STATIC);
+        sqlite3_bind_text(stmt_insert, 5, info->cliente->fecha_inicio, -1, SQLITE_STATIC);
+        sqlite3_bind_text(stmt_insert, 6, info->cliente->fecha_fin, -1, SQLITE_STATIC);
+        sqlite3_step(stmt_insert);
+        int cliente_id = sqlite3_last_insert_rowid(info->db);
+        sqlite3_finalize(stmt_insert);
+
+        // Insertar en pago_cliente
+        const char *sql_pago = "INSERT INTO pago_cliente (cliente_id, saldo_pendiente, meses_adelantados, años_adelantados) VALUES (?, 0, 0, 0);";
+        sqlite3_stmt *stmt_pago;
+        sqlite3_prepare_v2(info->db, sql_pago, -1, &stmt_pago, NULL);
+        sqlite3_bind_int(stmt_pago, 1, cliente_id);
+        sqlite3_step(stmt_pago);
+        sqlite3_finalize(stmt_pago);
+
+        // Insertar en asistencia
+        const char *sql_asistencia = "INSERT INTO asistencia (id_nfc, cliente_id) VALUES (?, ?);";
+        sqlite3_stmt *stmt_asistencia;
+        sqlite3_prepare_v2(info->db, sql_asistencia, -1, &stmt_asistencia, NULL);
+        sqlite3_bind_text(stmt_asistencia, 1, id_nfc, -1, SQLITE_STATIC);
+        sqlite3_bind_int(stmt_asistencia, 2, cliente_id);
+        sqlite3_step(stmt_asistencia);
+        sqlite3_finalize(stmt_asistencia);
+
+        gtk_label_set_text(GTK_LABEL(label_warn_general),
+            "✔️ Cliente registrado exitosamente y vinculado con tarjeta NFC.");
+        sqlite3_close(info->db);
+        free(info->cliente);
+        free(info);
+        return FALSE;
+    }
+
+    if (++info->intentos > 100) {
+        gtk_label_set_markup(GTK_LABEL(label_warn_general),
+            "<span foreground='#ff4d4d'><b>⚠️ Tiempo agotado. No se detectó tarjeta.</b></span>");
+        sqlite3_close(info->db);
+        free(info->cliente);
+        free(info);
+        return FALSE;
+    }
+
+    return TRUE; // seguir esperando
+}
+
 
 
 

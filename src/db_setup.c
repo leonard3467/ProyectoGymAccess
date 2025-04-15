@@ -60,6 +60,24 @@ int inicializar_base_datos() {
         printf("Tabla 'pago_cliente' creada correctamente o ya existente.\n");
     }
 
+
+    const char *sql_asistencia = 
+    "CREATE TABLE IF NOT EXISTS asistencia ("
+    "id_nfc TEXT PRIMARY KEY, "
+    "cliente_id INTEGER NOT NULL, "
+    "FOREIGN KEY(cliente_id) REFERENCES clientes(id)"
+    ");";
+
+    rc = sqlite3_exec(db, sql_asistencia, 0, 0, &errMsg);
+    if (rc != SQLITE_OK) {
+        printf("Error al crear la tabla 'asistencia': %s\n", errMsg);
+        sqlite3_free(errMsg);
+        sqlite3_close(db);
+        return 3;
+    } else {
+        printf("Tabla 'asistencia' creada correctamente o ya existente.\n");
+    }
+
     sqlite3_close(db);
     printf("Base de datos inicializada con éxito.\n");
     return 0;

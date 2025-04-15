@@ -3,7 +3,7 @@
 
 #include <stdbool.h>
 #include <gtk/gtk.h>  // Asegurar que GTK esté disponible
-
+#include <sqlite3.h>
 #define MAX_DIAS_MES 31
 #define ARCHIVO_CLIENTES "clientes.txt"
 
@@ -21,6 +21,18 @@ typedef struct {
     int meses_adelantados;  
     int años_adelantados;  
 } Cliente;
+
+// Estructura auxiliar para esperar NFC de forma no bloqueante
+typedef struct {
+    GtkWidget *widget;
+    Cliente *cliente;
+    sqlite3 *db;
+    int intentos;
+} EsperaNFCData;
+
+// Función de verificación asíncrona (declaración)
+gboolean verificar_nfc_async(gpointer data);
+
 
 // 📌 Declaraciones de funciones
 

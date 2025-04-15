@@ -3,6 +3,7 @@
 #include "clientes.h"
 #include "pagar.h"
 #include <gtk/gtk.h>
+#include "asistencia.h"
 
 /* VARIABLES GLOBALES/ESTÁTICAS */
 static GtkWidget *ventana_principal = NULL;
@@ -26,7 +27,7 @@ GtkWidget* crear_pantalla_registro(void){
     return formulario;
 }
 
-#include "pagar.h"  // Incluir el header de pagar
+
 
 GtkWidget* crear_pantalla_pagar(void) {
     return generar_pago(obtener_ventana_principal()); 
@@ -41,13 +42,31 @@ GtkWidget* crear_pantalla_buscar(void){
     return box;
 }
 
-// Crea la pantalla de Acceso
 GtkWidget* crear_pantalla_acceso(void){
+    // Contenedor vertical principal
     GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 10);
-    GtkWidget *lbl = gtk_label_new("Pantalla de control de acceso (Próximamente)...");
-    gtk_box_pack_start(GTK_BOX(box), lbl, TRUE, TRUE, 0);
+    gtk_widget_set_halign(box, GTK_ALIGN_CENTER);   // 🔹 Centrado horizontal
+    gtk_widget_set_valign(box, GTK_ALIGN_START);    // 🔹 Pegado arriba
+
+    // 🟦 Mensaje visible en grande, centrado arriba
+    GtkWidget *lbl = gtk_label_new(NULL);
+    gtk_label_set_markup(GTK_LABEL(lbl),
+        "<span font='20' weight='bold' foreground='#6cb398'>📶 Acerque su tarjeta al lector...</span>");
+    
+    gtk_widget_set_halign(lbl, GTK_ALIGN_CENTER);   // ✅ Centrado horizontal
+    gtk_widget_set_valign(lbl, GTK_ALIGN_START);    // 🔹 Alineado arriba
+    gtk_widget_set_margin_top(lbl, 60);             // 🔹 Margen desde arriba
+    gtk_widget_set_margin_start(lbl, 50);           // 🔹 Espacio izquierdo (opcional)
+
+    // Agregar el label al contenedor
+    gtk_box_pack_start(GTK_BOX(box), lbl, FALSE, FALSE, 0);
+
+    // ⏱️ Iniciar el chequeo constante cada 300 ms
+    g_timeout_add(300, verificar_lectura_nfc_simple, NULL);
+
     return box;
 }
+
 
 void construir_interfaz()
 {

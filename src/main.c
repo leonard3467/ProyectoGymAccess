@@ -2,6 +2,8 @@
 #include "interfaz.h"
 #include "clientes.h"
 #include "db_setup.h" 
+#include "asistencia.h"
+#include <process.h>  // Para _beginthread
 
 #define MAX_CLIENTES 100  // Límite de clientes a recuperar
 
@@ -14,10 +16,7 @@ int main(int argc, char *argv[]) {
     }
     gtk_init(&argc, &argv);
 
-    /*
-    Cliente clientes[MAX_CLIENTES];
-    int cantidad = recuperar_clientes(clientes, MAX_CLIENTES);
-    */
+    _beginthread((void(*)(void*))iniciar_lector_serial, 0, NULL);
    
     construir_interfaz();
     gtk_main();
